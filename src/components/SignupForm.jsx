@@ -29,7 +29,7 @@ const SignupForm = () => {
               <input type="text" name="lastName" id="lastName" placeholder=" Deo" onChange={handleChanges} required className="border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 "/>
             </label>
           <label htmlFor="number" className="flex flex-col" > Number:
-            <input type="number" name="number" id="number" placeholder=" 9876543210" onChange={handleChanges} required minLength={10} className="border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 "/>
+            <input type="tel" name="number" id="number" placeholder=" 9876543210" onChange={handleChanges} required minLength={10} className="border appearance-none rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 "/>
           </label>
           <button type="submit" className="text-white text-center bg-black rounded-4xl py-2 px-6" onClick={handleSubmit}>Sign Up</button>
         </div>
