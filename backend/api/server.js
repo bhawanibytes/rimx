@@ -6,7 +6,7 @@ const app = express();
 require("dotenv").config();
 
 //importing routes
-const authRouter = require('./routes/auth.js');
+const authRouter = require('../routes/auth.js');
 
 app.get('/', (req, res) => {
   res.send('Server is running');
