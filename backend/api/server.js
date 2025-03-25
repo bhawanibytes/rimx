@@ -9,7 +9,7 @@ require("dotenv").config();
 const authRouter = require('../routes/auth.js');
 
 app.get('/', (req, res) => {
-  res.send('Server is running');
+  res.status(200).json({ 'Message': 'Server is running' });
 });
 
 app.use('/api/v1/auth', authRouter);
