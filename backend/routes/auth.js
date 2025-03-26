@@ -1,12 +1,14 @@
-const { Router } = require("express");
+import { Router } from 'express'
 const authRouter = Router();
+import { login, signup } from '../controllers/authController.js'
 
 authRouter.get("/health", (req, res) => {
   res.send("Health of authRouter is fine");
 });
 
-authRouter.post("/signup", (req, res) => {
-  res.send("Hello World from login");
-});
+authRouter.post("/signup", signup)
+authRouter.post("/login", login)
 
-module.exports = authRouter;
+export {
+  authRouter
+}
