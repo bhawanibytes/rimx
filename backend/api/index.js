@@ -11,6 +11,8 @@ dotenv.config();
 connectDB()
 const corsOption ={
   origin: process.env.CORS_FRONTEND,
+  
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   optionSuccessStatus: 200
 }
 
