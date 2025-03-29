@@ -5,12 +5,13 @@ import Signup from './pages/Signup'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import LoginForm from './components/LoginForm'
+import WelcomePage from './pages/WelcomePage'
 // import { AuthProvider } from './context/AuthContext';
 
 function App() {
 
   return (
-    <main style={{ marginTop: '86px' }}>
+    <main style={{ marginTop: '60px' }}>
          <BrowserRouter>
          {/* <AuthProvider> */}
     <Navbar/>
@@ -20,6 +21,7 @@ function App() {
       {/* <Route path="/AdminPanel" element={<AdminPanel/>}/> */}
       <Route path='/signup' element={<Signup/>}/>
       <Route path='/login' element={<LoginForm/>}/>
+      <Route path='/WelcomePage' element={<WelcomePage/>}/>
     </Routes>
     <Footer/> 
     {/* </AuthProvider> */}

@@ -18,6 +18,8 @@ const SignupForm = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -55,6 +57,7 @@ const SignupForm = () => {
 
     setIsLoading(true);
     setError(null);
+    setSuccess(false);
 
     try {
       const userData = {
@@ -63,12 +66,19 @@ const SignupForm = () => {
         emailId: formData.email,
         phone: formData.phone,
         password: formData.password
-        // Role is no longer sent from frontend
       };
 
       const response = await signupUser(userData);
       console.log("Signup successful:", response);
-      navigate('/login'); // Redirect to login after successful signup
+      
+      // Set success state and message
+      setSuccess(true);
+      setSuccessMessage(response.data?.message || "Account created successfully! Redirecting to login...");
+      
+      // Redirect after 3 seconds
+      setTimeout(() => {
+        navigate('/login');
+      }, 3000);
       
     } catch (err) {
       console.error("Signup error:", err);
@@ -80,6 +90,27 @@ const SignupForm = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 flex items-center justify-center p-4">
+      {/* Success Popup Modal */}
+      {success && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl p-6 max-w-sm w-full border border-green-500 animate-fade-in">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-green-900/30 rounded-full flex items-center justify-center mb-4">
+                <Check className="h-10 w-10 text-green-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Success!</h3>
+              <p className="text-gray-300 mb-6">{successMessage}</p>
+              <div className="w-full bg-gray-700 rounded-full h-1.5">
+                <div 
+                  className="bg-green-500 h-1.5 rounded-full animate-progress" 
+                  style={{ animationDuration: '3s' }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-6xl flex bg-gray-800 rounded-2xl shadow-xl border border-gray-700 overflow-hidden">
         {/* Left Side - Promotional Content */}
         <div className="hidden md:flex flex-col justify-center p-12 bg-gradient-to-br from-blue-900/80 to-purple-900/80 w-1/2">

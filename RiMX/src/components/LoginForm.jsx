@@ -30,6 +30,7 @@ const LoginForm = () => {
     }
 
     setIsLoading(true);
+    setError(null);
 
     try {
       const response = await loginUser({
@@ -37,14 +38,46 @@ const LoginForm = () => {
         password: formData.password
       });
       
-      dispatch(setCredentials({
-        user: response.data.user,
-        token: response.data.token
-      }));
+      console.log("API Response:", response); // Debugging log
 
-      navigate('/welcome');
+      if (!response) {
+        throw new Error("No response received from server");
+      }
+
+      // Handle different successful response formats
+      if (response.data?.token) {
+        dispatch(setCredentials({
+          user: response.data.user,
+          token: response.data.token
+        }));
+        navigate('/WelcomePage');
+        return;
+      }
+
+      // Handle alternative successful response format
+      if (response.token) {
+        dispatch(setCredentials({
+          user: response.user,
+          token: response.token
+        }));
+        navigate('/WelcomePage');
+        return;
+      }
+
+      // Handle API error messages
+      if (response.message) {
+        throw new Error(response.message);
+      }
+
+      if (response.data?.message) {
+        throw new Error(response.data.message);
+      }
+
+      throw new Error("Login failed - unexpected response format");
+
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed. Please try again.");
+      console.error("Login error:", err);
+      setError(err.message || "Login failed. Please check your credentials and try again.");
     } finally {
       setIsLoading(false);
     }
