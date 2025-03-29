@@ -60,7 +60,7 @@ const SignupForm = () => {
       const userData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
-        email: formData.email,
+        emailId: formData.email,
         phone: formData.phone,
         password: formData.password
         // Role is no longer sent from frontend

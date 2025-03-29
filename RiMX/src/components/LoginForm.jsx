@@ -33,7 +33,7 @@ const LoginForm = () => {
 
     try {
       const response = await loginUser({
-        email: formData.email,
+        emailId: formData.email,
         password: formData.password
       });
       

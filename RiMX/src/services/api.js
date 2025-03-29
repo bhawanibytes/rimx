@@ -1,9 +1,7 @@
-
 import axios from 'axios';
 
-
 const api = axios.create({
-  baseURL: 'https://apirmix.vercel.app/v1', 
+  baseURL: import.meta.env.VITE_BACKEND_URL,
   timeout: 10000, 
   headers: {
     'Content-Type': 'application/json',
@@ -21,7 +19,7 @@ api.interceptors.request.use((config) => {
 
 export const loginUser = async (credentials) => {
   try {
-    const response = await api.post('/auth/login', credentials);
+    const response = await api.post('/v1/auth/login', credentials);
     return response.data;
   } catch (error) {
     throw new Error(
@@ -34,7 +32,7 @@ export const loginUser = async (credentials) => {
 
 export const signupUser = async (userData) => {
     try {
-      const response = await api.post('/auth/signup', userData);
+      const response = await api.post('/v1/auth/signup', userData);
       return response.data;
     } catch (error) {
       throw new Error(
