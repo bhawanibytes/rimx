@@ -1,54 +1,32 @@
-import 'dotenv/config';
 import express from 'express';
-import mongoose from 'mongoose';
-import cors from 'cors';
-import auth from '../middlewares/auth.js';
-import Organization from '../models/Organization.js';
-import User from '../models/userModel.js';
-import authRoutes from '../routes/auth.js';
-import organizationRoutes from '../routes/organizations.js';
-// import invitationRoutes from '../routes/invitations.js';
+import dotenv from 'dotenv';
+import connectDB from '../config/db.js';
+import cors from 'cors'
+//importing routes
+import { authRouter } from '../routes/auth.js'
 
 const app = express();
+//injecting environment variables
+dotenv.config();
+connectDB()
+const corsOption ={
+  origin: process.env.CORS_FRONTEND,
+  
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  optionSuccessStatus: 200
+}
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors(corsOption))
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/org-manager', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('MongoDB connected'))
-.catch(err => console.error('MongoDB connection error:', err));
+//express body parser
+app.use(express.json())
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/organizations', organizationRoutes);
-// app.use('/api/invitations', invitationRoutes);
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something broke!' });
+app.get('/', (req, res) => {
+  res.status(200).json({ 'Message': 'Server is running' });
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date() });
-});
+app.use('/v1/auth', authRouter);
 
-// Protected test route
-app.get('/api/protected', auth, (req, res) => {
-  res.json({ message: 'Protected route accessed', user: req.user });
+app.listen(3000, () => {
+  console.log('Server is running on port 3000');
 });
-
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
-
-export default app; // For testing

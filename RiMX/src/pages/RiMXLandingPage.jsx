@@ -295,7 +295,7 @@ const RiMXLandingPage = () => {
                 Start Free Trial
               </motion.button>
             </Link>
-            <Link to="/Demopage">
+            <Link to="/demo">
               <motion.button 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -613,7 +613,7 @@ const RiMXLandingPage = () => {
                     </li>
                   ))}
                 </ul>
-                <Link to={plan.name === "Enterprise" ? "/ContactPage" : "/signup"}>
+                <Link to={plan.name === "Enterprise" ? "/contact" : "/signup"}>
                   <motion.button 
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
@@ -639,7 +639,7 @@ const RiMXLandingPage = () => {
             viewport={{ once: true }}
             className="text-center mt-12 text-gray-400"
           >
-            Need something different? <Link to="/ContactPage" className="text-blue-400 hover:underline">Contact us</Link> for custom solutions.
+            Need something different? <Link to="/contact" className="text-blue-400 hover:underline">Contact us</Link> for custom solutions.
           </motion.div>
         </div>
       </section>
@@ -730,7 +730,7 @@ const RiMXLandingPage = () => {
                 Start Free Trial
               </motion.button>
             </Link>
-            <Link to="/DemoPage">
+            <Link to="/demo">
               <motion.button 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

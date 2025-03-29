@@ -12,4 +12,3 @@ authRouter.post("/login", login)
 export {
   authRouter
 }
-export default authRouter;
