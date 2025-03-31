@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { Mail, Lock, Eye, EyeOff, Check } from "lucide-react";
 import { loginUser } from "../services/api";
-import { setCredentials } from "../redux/slices/authSlice";
+import { setCredentials } from "../features/slices/authSlice";
 
 const LoginForm = () => {
   const [formData, setFormData] = useState({

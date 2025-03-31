@@ -1,10 +1,16 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Zap, Search, Home, Layers, CreditCard, Users, Mail, User, ChevronDown, LogOut, PlusCircle, Settings } from 'lucide-react';
+import { logout, switchAccount } from '../features/slices/authSlice';
 
-const Navbar = ({ isAuthenticated = false, user = null }) => {
+const Navbar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { user, isAuthenticated, accounts } = useSelector((state) => state.auth);
+  
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
@@ -23,9 +29,24 @@ const Navbar = ({ isAuthenticated = false, user = null }) => {
   };
 
   const handleLogout = () => {
-    // Add your logout logic here
-    console.log("User logged out");
+    dispatch(logout());
     setAccountDropdownOpen(false);
+    setMobileMenuOpen(false);
+    navigate('/');
+  };
+
+  const handleSwitchAccount = (accountId) => {
+    dispatch(switchAccount(accountId));
+    setAccountDropdownOpen(false);
+    setMobileMenuOpen(false);
+  };
+
+  const handleAddAccount = () => {
+    // Preserve current path for after login
+    const redirectPath = location.pathname;
+    navigate('/login', { state: { from: redirectPath, addAccount: true } });
+    setAccountDropdownOpen(false);
+    setMobileMenuOpen(false);
   };
 
   return (
@@ -93,7 +114,11 @@ const Navbar = ({ isAuthenticated = false, user = null }) => {
                     className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-700/50 transition-all"
                   >
                     <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
-                      <User size={16} className="text-white" />
+                      {user?.avatar ? (
+                        <img src={user.avatar} alt="Profile" className="w-full h-full rounded-full" />
+                      ) : (
+                        <User size={16} className="text-white" />
+                      )}
                     </div>
                     <span className="text-sm font-medium text-white">
                       {user?.name || "Account"}
@@ -138,27 +163,28 @@ const Navbar = ({ isAuthenticated = false, user = null }) => {
                         
                         <button
                           className="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50"
-                          onClick={() => {
-                            // Add switch account logic here
-                            console.log("Switch account clicked");
-                            setAccountDropdownOpen(false);
-                          }}
+                          onClick={handleAddAccount}
                         >
                           <PlusCircle size={16} className="mr-3" />
                           Add Account
                         </button>
                         
-                        <button
-                          className="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50"
-                          onClick={() => {
-                            // Add switch account logic here
-                            console.log("Switch account clicked");
-                            setAccountDropdownOpen(false);
-                          }}
-                        >
-                          <Users size={16} className="mr-3" />
-                          Switch Account
-                        </button>
+                        {accounts.length > 1 && (
+                          <>
+                            <div className="border-t border-gray-700"></div>
+                            <div className="px-3 py-2 text-xs text-gray-400">Switch to:</div>
+                            {accounts.filter(acc => acc.user.id !== user.id).map(account => (
+                              <button
+                                key={account.user.id}
+                                className="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50"
+                                onClick={() => handleSwitchAccount(account.user.id)}
+                              >
+                                <Users size={16} className="mr-3" />
+                                {account.user.name}
+                              </button>
+                            ))}
+                          </>
+                        )}
                         
                         <div className="border-t border-gray-700"></div>
                         
@@ -177,12 +203,14 @@ const Navbar = ({ isAuthenticated = false, user = null }) => {
                 <>
                   <Link
                     to="/login"
+                    state={{ from: location.pathname }}
                     className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors"
                   >
                     Log in
                   </Link>
                   <Link
                     to="/signup"
+                    state={{ from: location.pathname }}
                     className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all shadow-md"
                   >
                     Sign up
@@ -274,7 +302,11 @@ const Navbar = ({ isAuthenticated = false, user = null }) => {
                 <>
                   <div className="px-3 py-3 flex items-center">
                     <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center mr-3">
-                      <User size={18} className="text-white" />
+                      {user?.avatar ? (
+                        <img src={user.avatar} alt="Profile" className="w-full h-full rounded-full" />
+                      ) : (
+                        <User size={18} className="text-white" />
+                      )}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-white">{user?.name || "Account"}</p>
@@ -300,23 +332,28 @@ const Navbar = ({ isAuthenticated = false, user = null }) => {
                   
                   <button
                     className="block w-full px-3 py-3 text-base font-medium text-left text-gray-300 hover:text-white hover:bg-gray-700/30 rounded-lg"
-                    onClick={() => {
-                      console.log("Add account clicked");
-                      setMobileMenuOpen(false);
-                    }}
+                    onClick={handleAddAccount}
                   >
                     Add Account
                   </button>
                   
-                  <button
-                    className="block w-full px-3 py-3 text-base font-medium text-left text-gray-300 hover:text-white hover:bg-gray-700/30 rounded-lg"
-                    onClick={() => {
-                      console.log("Switch account clicked");
-                      setMobileMenuOpen(false);
-                    }}
-                  >
-                    Switch Account
-                  </button>
+                  {accounts.length > 1 && (
+                    <>
+                      <div className="px-3 py-2 text-xs text-gray-400">Switch to:</div>
+                      {accounts.filter(acc => acc.user.id !== user.id).map(account => (
+                        <button
+                          key={account.user.id}
+                          className="block w-full px-3 py-3 text-base font-medium text-left text-gray-300 hover:text-white hover:bg-gray-700/30 rounded-lg"
+                          onClick={() => {
+                            handleSwitchAccount(account.user.id);
+                            setMobileMenuOpen(false);
+                          }}
+                        >
+                          {account.user.name}
+                        </button>
+                      ))}
+                    </>
+                  )}
                   
                   <button
                     onClick={handleLogout}
@@ -329,6 +366,7 @@ const Navbar = ({ isAuthenticated = false, user = null }) => {
                 <>
                   <Link
                     to="/login"
+                    state={{ from: location.pathname }}
                     className="block w-full px-3 py-3 text-base font-medium text-center text-gray-300 hover:text-white hover:bg-gray-700/30 rounded-lg"
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -336,6 +374,7 @@ const Navbar = ({ isAuthenticated = false, user = null }) => {
                   </Link>
                   <Link
                     to="/signup"
+                    state={{ from: location.pathname }}
                     className="block w-full mt-2 px-3 py-3 text-base font-medium text-center text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all"
                     onClick={() => setMobileMenuOpen(false)}
                   >
