@@ -1,10 +1,25 @@
+// import { configureStore } from '@reduxjs/toolkit';
+// import authReducer from '../features/slices/authSlice';
+// // import orgReducer from './slices/orgSlice';
+
+// export const store = configureStore({
+//   reducer: {
+//     auth: authReducer,
+//     // org: orgReducer,
+//   },
+// });
+// store.js
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../features/slices/authSlice';
-// import orgReducer from './slices/orgSlice';
+import organizationReducer from '../features/organization/organizationSlice';
+import invitationReducer from '../features/invitation/invitationSlice';
+import membershipReducer from '../features/membership/membershipSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
-    // org: orgReducer,
+    organizations: organizationReducer,
+    invitations: invitationReducer,
+    memberships: membershipReducer
   },
 });
