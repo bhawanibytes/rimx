@@ -30,22 +30,27 @@ const authSlice = createSlice({
   initialState: loadInitialState(),
   reducers: {
     setCredentials: (state, action) => {
+      if (!action.payload.user) {
+        console.error("Invalid user payload:", action.payload);
+        return;
+      }
+
       state.user = action.payload.user;
       state.token = action.payload.token;
       state.isAuthenticated = true;
       state.error = null;
-      
+
       // Add to accounts if not already present
       if (
-        action.payload.user && // Ensure action.payload.user exists
-        !state.accounts.some(acc => acc.user && acc.user.id === action.payload.user.id) // Ensure acc.user exists
+        action.payload.user &&
+        !state.accounts.some(acc => acc.user && acc.user.id === action.payload.user.id)
       ) {
         state.accounts.push({
           user: action.payload.user,
           token: action.payload.token
         });
       }
-      
+
       // Persist to localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('auth', JSON.stringify({
@@ -54,6 +59,7 @@ const authSlice = createSlice({
           isAuthenticated: true,
           accounts: state.accounts
         }));
+        localStorage.setItem('authToken', state.token);
       }
     },
     logout: (state) => {
