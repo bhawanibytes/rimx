@@ -15,17 +15,13 @@ const organizationSchema = new mongoose.Schema({
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'User', // Reference to the User model
     required: true
   },
-  logo: {
-    type: String, // URL to logo image
-    default: ''
-  },
-  status: {
-    type: String,
-    enum: ['active', 'archived'],
-    default: 'active'
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', // Reference to the User model
+    required: true
   },
   createdAt: {
     type: Date,
@@ -42,8 +38,5 @@ organizationSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
-
-// Add text index for search functionality
-organizationSchema.index({ name: 'text', description: 'text' });
 
 export default mongoose.model('Organization', organizationSchema);

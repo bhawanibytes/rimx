@@ -75,7 +75,7 @@ const WelcomePage = () => {
         })
       ).unwrap();
       console.log("Organization created successfully:", result);
-      navigate(`/org/${result.id}/dashboard`);
+      navigate(`/OrganizationDashboard`);
     } catch (error) {
       console.error("Organization creation failed:", error);
     }

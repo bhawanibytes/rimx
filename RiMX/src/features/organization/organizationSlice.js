@@ -2,7 +2,9 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import {
   createOrganization as createOrgAPI,
   fetchUserOrganizations as fetchUserOrgsAPI,
-  getOrganizationDetails
+  getOrganizationDetails,
+  deleteOrganization as deleteOrgAPI,
+  updateOrganization as updateOrgAPI // Import the update API
 } from '../../services/api';
 
 const initialState = {
@@ -29,7 +31,20 @@ export const createOrganization = createAsyncThunk(
       return rejectWithValue("User is not authenticated or user ID is missing.");
     }
     try {
-      return await createOrgAPI({ ...orgData, createdBy: auth.user.id });
+      const response = await createOrgAPI({ ...orgData, createdBy: auth.user.id });
+
+      console.log("Create Organization Response in Thunk:", response);
+      if (!response.organization?.id) {
+        console.error("Organization ID is missing in the response.");
+        throw new Error("Organization ID is missing in the response.");
+      }
+
+      // Store the organization ID in localStorage
+      const orgId = response.organization.id;
+      localStorage.setItem('orgId', orgId);
+      console.log("Organization ID stored in localStorage:", orgId);
+
+      return response.organization;
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -38,8 +53,46 @@ export const createOrganization = createAsyncThunk(
 
 export const fetchOrganizationDetails = createAsyncThunk(
   'organizations/fetchDetails',
-  async (orgId) => {
-    return await getOrganizationDetails(orgId);
+  async (orgId, { rejectWithValue }) => {
+    try {
+      if (!orgId) {
+        throw new Error("Organization ID is missing.");
+      }
+      console.log("Fetching organization details for orgId:", orgId);
+      const organization = await getOrganizationDetails(orgId);
+      return organization; // Return the organization object
+    } catch (error) {
+      console.error("Error fetching organization details:", error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch organization details.');
+    }
+  }
+);
+
+export const deleteOrganization = createAsyncThunk(
+  'organizations/delete',
+  async (orgId, { rejectWithValue }) => {
+    try {
+      await deleteOrgAPI(orgId); // Call the delete API
+      return orgId; // Return the deleted organization's ID
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to delete organization.');
+    }
+  }
+);
+
+// New Thunk: Update Organization
+export const updateOrganization = createAsyncThunk(
+  'organizations/update',
+  async ({ orgId, updatedData }, { rejectWithValue }) => {
+    try {
+      console.log('Updating organization with ID:', orgId); // Debugging log
+      const response = await api.put(`/v1/org/organizations/${orgId}`, updatedData);
+      console.log('Updated organization response:', response.data); // Debugging log
+      return response.data.organization; // Return the updated organization data
+    } catch (error) {
+      console.error('Error updating organization:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to update organization.');
+    }
   }
 );
 
@@ -95,7 +148,48 @@ const organizationSlice = createSlice({
       })
       .addCase(fetchOrganizationDetails.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message;
+        state.error = action.payload || action.error.message;
+      })
+
+      // Delete Organization
+      .addCase(deleteOrganization.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteOrganization.fulfilled, (state, action) => {
+        state.loading = false;
+        // Remove the deleted organization from the list
+        state.userOrganizations = state.userOrganizations.filter(
+          (org) => org._id !== action.payload
+        );
+      })
+      .addCase(deleteOrganization.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || action.error.message;
+      })
+
+      // Update Organization
+      .addCase(updateOrganization.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateOrganization.fulfilled, (state, action) => {
+        state.loading = false;
+        // Update the organization in the list
+        const index = state.userOrganizations.findIndex(
+          (org) => org._id === action.payload._id
+        );
+        if (index !== -1) {
+          state.userOrganizations[index] = action.payload;
+        }
+        // Update the current organization if it matches
+        if (state.currentOrganization?._id === action.payload._id) {
+          state.currentOrganization = action.payload;
+        }
+      })
+      .addCase(updateOrganization.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || action.error.message;
       });
   }
 });

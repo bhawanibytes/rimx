@@ -72,6 +72,7 @@ const login = async (req, res) => {
             success: true,
             message: 'loggedIn',
             token,
+            // userId: user._id,
             user: {
                 id: user._id, // MongoDB ID
                 name: `${user.firstName} ${user.lastName}`, // Full name

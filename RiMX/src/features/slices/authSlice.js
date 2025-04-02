@@ -60,6 +60,7 @@ const authSlice = createSlice({
           accounts: state.accounts
         }));
         localStorage.setItem('authToken', state.token);
+        localStorage.setItem('userId', state.user.id);
       }
     },
     logout: (state) => {
