@@ -35,7 +35,7 @@ const OrganizationDashboard = () => {
   const orgId = localStorage.getItem('orgId');
   const userId = localStorage.getItem('userId');
   console.log("Retrieved userId from localStorage:", userId);
-  
+  console.log("Retrieved orgId from localStorage:", orgId);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
@@ -110,8 +110,11 @@ const OrganizationDashboard = () => {
       return;
     }
     try {
+      console.log('Current Organization:', currentOrganization); // Debugging log
+      console.log('Organization ID:', currentOrganization?.id); // Debugging log
+
       await dispatch(updateOrganization({
-        orgId: currentOrganization?._id,
+        orgId: currentOrganization?.id, // Ensure this is correct
         updatedData: { name: updatedName, description: updatedDescription },
       })).unwrap();
       setIsEditing(false);

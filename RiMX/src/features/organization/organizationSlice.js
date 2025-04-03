@@ -6,7 +6,7 @@ import {
   deleteOrganization as deleteOrgAPI,
   updateOrganization as updateOrgAPI // Import the update API
 } from '../../services/api';
-
+import api from '../../services/api';
 const initialState = {
   userOrganizations: [],
   currentOrganization: null,
