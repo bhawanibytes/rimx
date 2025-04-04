@@ -32,6 +32,7 @@ const WelcomePage = () => {
   const [selectedRole, setSelectedRole] = useState("member");
   const [showRoleDropdown, setShowRoleDropdown] = useState(null);
   const [message, setMessage] = useState({ text: "", isSuccess: false });
+  const [requestedOrgs, setRequestedOrgs] = useState([]); // Track which orgs have requests
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const orgId = localStorage.getItem("orgId");
@@ -70,11 +71,24 @@ const WelcomePage = () => {
   }, [dispatch]);
 
   // Show join request errors if they exist
-  useEffect(() => {
-    if (joinRequestError) {
-      showMessage(joinRequestError, false);
+useEffect(() => {
+  if (joinRequestError) {
+    // Handle both string and object error formats
+    const errorMessage = typeof joinRequestError === 'string' 
+      ? joinRequestError 
+      : joinRequestError.message || 'Request failed';
+    
+    showMessage(errorMessage, false);
+    
+    // If the error indicates a request already exists, add to requestedOrgs
+    if (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes("already requested")) {
+      const orgId = errorMessage.match(/organization (\w+)/)?.[1];
+      if (orgId) {
+        setRequestedOrgs(prev => [...prev, orgId]);
+      }
     }
-  }, [joinRequestError]);
+  }
+}, [joinRequestError]);
 
   // Show message and auto-hide after 3 seconds
   const showMessage = (text, isSuccess = true) => {
@@ -125,35 +139,36 @@ const WelcomePage = () => {
   };
 
   // Handle join requests
- // Handle join requests
-const handleJoinRequest = async (orgId) => {
-  try {
-    const response = await dispatch(
-      sendJoinRequest({
-        organizationId: orgId,
-        role: selectedRole,
-      })
-    ).unwrap();
-    
-    // Check if response is an object with message property
-    if (response && typeof response === 'object') {
-      if (response.success) {
-        showMessage(response.message || 'Join request sent successfully!');
+  const handleJoinRequest = async (orgId) => {
+    try {
+      const response = await dispatch(
+        sendJoinRequest({
+          organizationId: orgId,
+          role: selectedRole,
+        })
+      ).unwrap();
+      
+      if (response?.success || typeof response === 'string') {
+        showMessage(response?.message || 'Join request sent successfully!');
+        setRequestedOrgs(prev => [...prev, orgId]);
         setShowRoleDropdown(null);
       } else {
-        showMessage(response.message || 'Failed to send join request!', false);
+        showMessage(response?.message || 'Failed to send join request!', false);
       }
-    } else {
-      // Handle case where response is just a string or other format
-      showMessage('Join request sent successfully!');
-      setShowRoleDropdown(null);
+    } catch (error) {
+      // Handle both string and object error formats
+      const errorMessage = typeof error === 'string' 
+        ? error 
+        : error?.message || 'Failed to send join request!';
+      
+      showMessage(errorMessage, false);
+        
+      // If error indicates request already exists, update requestedOrgs
+      if (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes("already requested")) {
+        setRequestedOrgs(prev => [...prev, orgId]);
+      }
     }
-  } catch (error) {
-    // Handle cases where error is an object with message or just a string
-    const errorMessage = error?.message || error || 'Failed to send join request!';
-    showMessage(errorMessage, false);
-  }
-};
+  };
 
   // UI Components
   const RoleBadge = ({ role }) => {
@@ -484,6 +499,13 @@ const handleJoinRequest = async (orgId) => {
                                   <X className="h-5 w-5" />
                                 </button>
                               </div>
+                            ) : requestedOrgs.includes(org._id) ? (
+                              <button
+                                disabled
+                                className="px-4 py-2 bg-gray-600/50 text-gray-300 rounded-lg cursor-not-allowed"
+                              >
+                                Request Sent
+                              </button>
                             ) : (
                               <button
                                 onClick={() => setShowRoleDropdown(org._id)}

@@ -5,6 +5,8 @@ import cors from 'cors';
 import authRouter from '../routes/auth.js'; // Assuming this exists
 import organizationRouter from '../routes/organizations.js'; // Import the updated organization router
 import auth from '../middlewares/auth.js'; // Import the auth middleware
+import joinRequests from '../routes/joinRequests.js';
+
 const app = express();
 
 // Inject environment variables
@@ -32,6 +34,7 @@ app.use('/v1/auth', authRouter);
 
 // Organization routes (without auth middleware)
 app.use('/v1/org/organizations',auth, organizationRouter);
+app.use('/v1/org/organizations',auth, joinRequests);
 
 // Error handling middleware (should be last)
 app.use((err, req, res, next) => {

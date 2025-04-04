@@ -65,7 +65,6 @@ const login = async (req, res) => {
 
         // Generate a valid JWT token
         const token = generateToken({ id: user._id });
-        console.log("Generated Token:", token); // Debugging
 
         // Return the required JSON response
         return res.status(200).json({

@@ -21,7 +21,7 @@ const invitationSchema = new mongoose.Schema({
   token: {
     type: String,
     required: true,
-    unique: true
+    unique: true // Mongoose will automatically create a unique index for this field
   },
   invitedBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -44,7 +44,6 @@ const invitationSchema = new mongoose.Schema({
 
 // Indexes for faster queries
 invitationSchema.index({ email: 1, organization: 1 });
-invitationSchema.index({ token: 1 }, { unique: true });
 invitationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // Auto-delete expired
 
 // Prevent duplicate pending invitations
