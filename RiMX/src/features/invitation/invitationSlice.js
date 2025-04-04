@@ -6,7 +6,7 @@ const initialState = {
   loading: false,
   error: null
 };
-
+const user = localStorage.getItem('userId'); // Assuming you have a way to get the user ID
 export const fetchPendingInvitations = createAsyncThunk(
   'invitations/fetchPending',
   async (organizationId) => {
@@ -17,12 +17,22 @@ export const fetchPendingInvitations = createAsyncThunk(
 
 export const inviteUser = createAsyncThunk(
   'invitations/create',
-  async ({ organizationId, email, role }) => {
-    const response = await api.post(`/v1/org/organization/${organizationId}/invitations`, {
-      email,
-      role
-    });
-    return response.data;
+  async ({ orgId, email, role }, { rejectWithValue }) => {
+    try {
+      const token = Math.random().toString(36).substring(2, 15); // Example token generation
+      const expiresAt = Math.random() * 1000 * 60 * 60 * 24 * 7; // 1 week in milliseconds
+      console.log('Payload being sent:', { orgId, email, role }); // Debugging log
+      const response = await api.post(`/v1/org/organizations/${orgId}/invitations`, {
+       orgId,
+        email,
+        role,token,invitedBy:user,
+        expiresAt
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error inviting user:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to send invitation.');
+    }
   }
 );
 
@@ -55,7 +65,7 @@ const invitationSlice = createSlice({
         state.pendingInvitations = action.payload;
       })
       .addCase(inviteUser.fulfilled, (state, action) => {
-        state.pendingInvitations.push(action.payload);
+        state.pendingInvitations.push(action.payload.invitation);
       })
       .addCase(respondToInvitation.fulfilled, (state, action) => {
         state.pendingInvitations = state.pendingInvitations.filter(

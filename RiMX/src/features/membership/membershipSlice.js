@@ -9,9 +9,9 @@ const initialState = {
 
 export const fetchMembers = createAsyncThunk(
   'memberships/fetchAll',
-  async (organizationId, { rejectWithValue }) => {
+  async (orgId, { rejectWithValue }) => {
     try {
-      const response = await api.get(`/v1/org/organizations/${organizationId}/members`);
+      const response = await api.get(`/v1/org/organizations/${orgId}/members`);
       return response.data;
     } catch (error) {
       console.error("Error fetching members:", error.response?.data || error.message);
@@ -22,7 +22,7 @@ export const fetchMembers = createAsyncThunk(
 
 export const updateMemberRole = createAsyncThunk(
   'memberships/updateRole',
-  async ({ organizationId, userId, newRole }, { rejectWithValue }) => {
+  async ({ orgId, userId, newRole }, { rejectWithValue }) => {
     try {
       const response = await api.patch(
         `/v1/org/organizations/${organizationId}/members/${userId}`,
@@ -38,9 +38,9 @@ export const updateMemberRole = createAsyncThunk(
 
 export const removeMember = createAsyncThunk(
   'memberships/remove',
-  async ({ organizationId, userId }, { rejectWithValue }) => {
+  async ({ orgId, userId }, { rejectWithValue }) => {
     try {
-      await api.delete(`/v1/org/organizations/${organizationId}/members/${userId}`);
+      await api.delete(`/v1/org/organizations/${orgId}/members/${userId}`);
       return userId;
     } catch (error) {
       console.error("Error removing member:", error.response?.data || error.message);

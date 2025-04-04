@@ -33,7 +33,6 @@ export const createOrganization = createAsyncThunk(
     try {
       const response = await createOrgAPI({ ...orgData, createdBy: auth.user.id });
 
-      console.log("Create Organization Response in Thunk:", response);
       if (!response.organization?.id) {
         console.error("Organization ID is missing in the response.");
         throw new Error("Organization ID is missing in the response.");
@@ -42,7 +41,6 @@ export const createOrganization = createAsyncThunk(
       // Store the organization ID in localStorage
       const orgId = response.organization.id;
       localStorage.setItem('orgId', orgId);
-      console.log("Organization ID stored in localStorage:", orgId);
 
       return response.organization;
     } catch (error) {
@@ -58,7 +56,6 @@ export const fetchOrganizationDetails = createAsyncThunk(
       if (!orgId) {
         throw new Error("Organization ID is missing.");
       }
-      console.log("Fetching organization details for orgId:", orgId);
       const organization = await getOrganizationDetails(orgId);
       return organization; // Return the organization object
     } catch (error) {
@@ -85,13 +82,25 @@ export const updateOrganization = createAsyncThunk(
   'organizations/update',
   async ({ orgId, updatedData }, { rejectWithValue }) => {
     try {
-      console.log('Updating organization with ID:', orgId); // Debugging log
       const response = await api.put(`/v1/org/organizations/${orgId}`, updatedData);
-      console.log('Updated organization response:', response.data); // Debugging log
       return response.data.organization; // Return the updated organization data
     } catch (error) {
       console.error('Error updating organization:', error.response?.data || error.message);
       return rejectWithValue(error.response?.data?.message || 'Failed to update organization.');
+    }
+  }
+);
+
+// New Thunk: Fetch All Organizations
+export const fetchAllOrganizations = createAsyncThunk(
+  'organizations/fetchAll',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get('/v1/org/organizations/retrieve/allOrganizations');
+      return response.data.organizations; // Return the list of organizations
+    } catch (error) {
+      console.error('Error fetching all organizations:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch organizations.');
     }
   }
 );
@@ -188,6 +197,20 @@ const organizationSlice = createSlice({
         }
       })
       .addCase(updateOrganization.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || action.error.message;
+      })
+
+      // Fetch All Organizations
+      .addCase(fetchAllOrganizations.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchAllOrganizations.fulfilled, (state, action) => {
+        state.loading = false;
+        state.joinableOrganizations = action.payload; // Store the fetched organizations
+      })
+      .addCase(fetchAllOrganizations.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || action.error.message;
       });

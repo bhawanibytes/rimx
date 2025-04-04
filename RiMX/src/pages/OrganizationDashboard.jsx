@@ -18,6 +18,7 @@ import {
   RefreshCw,
   MoreVertical,
   ArrowLeft,
+  Clock,
 } from 'lucide-react';
 import {
   fetchOrganizationDetails,
@@ -29,13 +30,12 @@ import {
   updateMemberRole,
   removeMember,
 } from '../features/membership/membershipSlice';
-import { fetchPendingInvitations, respondToInvitation, inviteUser } from '../features/invitation/invitationSlice';
+import { inviteUser } from '../features/invitation/invitationSlice';
+import { fetchJoinRequestsForOrg, respondToJoinRequest } from '../features/joinRequest/joinRequestSlice';
 
 const OrganizationDashboard = () => {
   const orgId = localStorage.getItem('orgId');
   const userId = localStorage.getItem('userId');
-  console.log("Retrieved userId from localStorage:", userId);
-  console.log("Retrieved orgId from localStorage:", orgId);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
@@ -44,6 +44,8 @@ const OrganizationDashboard = () => {
   const [showRoleDropdown, setShowRoleDropdown] = useState(null);
   const [showMemberMenu, setShowMemberMenu] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [inviteError, setInviteError] = useState(null);
 
   // Redux state
   const { currentOrganization, loading: orgLoading, error } = useSelector(
@@ -52,8 +54,8 @@ const OrganizationDashboard = () => {
   const { members, loading: membersLoading } = useSelector(
     (state) => state.memberships
   );
-  const { pendingInvitations, loading: invitesLoading } = useSelector(
-    (state) => state.invitations
+  const { joinRequests, loading: requestsLoading } = useSelector(
+    (state) => state.joinRequests
   );
 
   // Local state
@@ -74,8 +76,8 @@ const OrganizationDashboard = () => {
         await dispatch(fetchOrganizationDetails(orgId)).unwrap();
         if (activeTab === 'members') {
           await dispatch(fetchMembers(orgId)).unwrap();
-        } else if (activeTab === 'invitations') {
-          await dispatch(fetchPendingInvitations(orgId)).unwrap();
+        } else if (activeTab === 'requests') {
+          await dispatch(fetchJoinRequestsForOrg(orgId)).unwrap();
         }
       } catch (error) {
         console.error("Error:", error.message);
@@ -85,6 +87,12 @@ const OrganizationDashboard = () => {
     fetchData();
   }, [orgId, activeTab, dispatch, navigate]);
 
+  useEffect(() => {
+    if (activeTab === 'requests') {
+      dispatch(fetchJoinRequestsForOrg(orgId));
+    }
+  }, [activeTab, dispatch, orgId]);
+
   // Update form fields
   useEffect(() => {
     if (currentOrganization) {
@@ -93,9 +101,19 @@ const OrganizationDashboard = () => {
     }
   }, [currentOrganization]);
 
+  // Reset messages after 3 seconds
+  useEffect(() => {
+    if (inviteSuccess || inviteError) {
+      const timer = setTimeout(() => {
+        setInviteSuccess(false);
+        setInviteError(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [inviteSuccess, inviteError]);
+
   // Organization actions
   const handleDeleteOrg = async () => {
-    console.log("Deleting organization with ID:", orgId);
     try {
       await dispatch(deleteOrganization(orgId)).unwrap();
       navigate('/organizations');
@@ -110,11 +128,8 @@ const OrganizationDashboard = () => {
       return;
     }
     try {
-      console.log('Current Organization:', currentOrganization); // Debugging log
-      console.log('Organization ID:', currentOrganization?.id); // Debugging log
-
       await dispatch(updateOrganization({
-        orgId: currentOrganization?.id, // Ensure this is correct
+        orgId: currentOrganization?.id,
         updatedData: { name: updatedName, description: updatedDescription },
       })).unwrap();
       setIsEditing(false);
@@ -127,23 +142,28 @@ const OrganizationDashboard = () => {
   const handleInviteUser = async (e) => {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
+    
+    setInviteError(null);
+    setInviteSuccess(false);
+    
     try {
       await dispatch(inviteUser({
-        organizationId: orgId,
+        orgId: orgId,
         email: inviteEmail,
         role: selectedRole,
       })).unwrap();
       setInviteEmail('');
       setIsInviting(false);
-      await dispatch(fetchPendingInvitations(orgId));
+      setInviteSuccess(true);
     } catch (error) {
       console.error('Error:', error.message);
+      setInviteError(error.message || 'Please invite a valid user. User with this email is not available.');
     }
   };
 
   const handleAddMembersClick = () => {
     setIsInviting(true);
-    setActiveTab('invitations');
+    setActiveTab('invite');
   };
 
   const handleUpdateMemberRole = async (memberId, newRole) => {
@@ -174,13 +194,13 @@ const OrganizationDashboard = () => {
     }
   };
 
-  const handleRespondToInvitation = async (invitationId, response) => {
+  const handleRespondToJoinRequest = async (requestId, response) => {
     try {
-      await dispatch(respondToInvitation({
-        invitationId,
+      await dispatch(respondToJoinRequest({
+        requestId,
         response,
       })).unwrap();
-      await dispatch(fetchPendingInvitations(orgId));
+      await dispatch(fetchJoinRequestsForOrg(orgId));
     } catch (error) {
       console.error('Error:', error.message);
     }
@@ -251,7 +271,7 @@ const OrganizationDashboard = () => {
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setIsEditing(true)}
-              className="flex items-center px-4 py-2 bg-blue-600/90 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
             >
               <Edit className="h-4 w-4 mr-2" />
               Edit
@@ -297,7 +317,7 @@ const OrganizationDashboard = () => {
                 </button>
                 <button
                   onClick={handleDeleteOrg}
-                  className="px-4 py-2 text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+                  className="px-4 py-2 text-white bg-gradient-to-r from-red-500 to-pink-600 rounded-lg hover:from-red-600 hover:to-pink-700 transition-colors"
                 >
                   Delete Organization
                 </button>
@@ -314,7 +334,8 @@ const OrganizationDashboard = () => {
             {[
               { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
               { id: 'members', icon: Users, label: 'Members' },
-              { id: 'invitations', icon: UserPlus, label: 'Invitations' },
+              { id: 'invite', icon: UserPlus, label: 'Invite Members' },
+              { id: 'requests', icon: Clock, label: 'Join Requests' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -401,7 +422,7 @@ const OrganizationDashboard = () => {
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={handleUpdateOrg}
-                          className="px-6 py-3 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                          className="px-6 py-3 text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
                         >
                           Update Organization
                         </motion.button>
@@ -430,6 +451,10 @@ const OrganizationDashboard = () => {
                             </div>
                             <p className="text-white">{currentOrganization.owner?.name || 'N/A'}</p>
                           </div>
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-400 mb-2">Members</h3>
+                          <p className="text-white">{members?.length || 0} total members</p>
                         </div>
                         <div>
                           <h3 className="text-sm font-medium text-gray-400 mb-2">Created At</h3>
@@ -465,7 +490,7 @@ const OrganizationDashboard = () => {
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={handleAddMembersClick}
-                        className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
                       >
                         <Plus className="h-5 w-5 mr-2" />
                         Add Members
@@ -548,7 +573,7 @@ const OrganizationDashboard = () => {
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={handleAddMembersClick}
-                        className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="mt-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
                       >
                         Invite Members
                       </motion.button>
@@ -558,30 +583,57 @@ const OrganizationDashboard = () => {
               </div>
             )}
 
-            {/* Invitations Tab */}
-            {activeTab === 'invitations' && (
+            {/* Invite Members Tab */}
+            {activeTab === 'invite' && (
               <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">
                 <div className="p-8">
                   <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-2xl font-bold text-white">Pending Invitations</h2>
+                    <h2 className="text-2xl font-bold text-white">Invite Members</h2>
                     <div className="flex space-x-3">
-                      <button
-                        onClick={() => dispatch(fetchPendingInvitations(orgId))}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
-                      >
-                        <RefreshCw className="h-5 w-5" />
-                      </button>
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => setIsInviting(true)}
-                        className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        onClick={() => setIsInviting(!isInviting)}
+                        className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
                       >
-                        <Plus className="h-5 w-5 mr-2" />
-                        New Invite
+                        {isInviting ? (
+                          <>
+                            <X className="h-5 w-5 mr-2" /> Cancel
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="h-5 w-5 mr-2" /> New Invite
+                          </>
+                        )}
                       </motion.button>
                     </div>
                   </div>
+
+                  {inviteSuccess && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mb-4 p-4 bg-green-500/10 text-green-400 rounded-lg border border-green-500/20"
+                    >
+                      <div className="flex items-center">
+                        <Check className="h-5 w-5 mr-2" />
+                        <span>Invitation sent successfully!</span>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {inviteError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mb-4 p-4 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20"
+                    >
+                      <div className="flex items-center">
+                        <X className="h-5 w-5 mr-2" />
+                        <span>{inviteError}</span>
+                      </div>
+                    </motion.div>
+                  )}
 
                   {isInviting && (
                     <motion.div
@@ -611,7 +663,7 @@ const OrganizationDashboard = () => {
                             className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                           >
                             <option value="admin">Admin</option>
-                            <option value="projectManager">ProjectManager</option>
+                            <option value="projectManager">Project Manager</option>
                             <option value="employee">Employee</option>
                             {currentOrganization.owner?._id === userId && (
                               <option value="owner">Owner</option>
@@ -630,76 +682,102 @@ const OrganizationDashboard = () => {
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             type="submit"
-                            className="px-6 py-3 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                            className="px-6 py-3 text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
                           >
-                            Send Invitation
+                            Invite
                           </motion.button>
                         </div>
                       </form>
                     </motion.div>
                   )}
 
-                  {invitesLoading ? (
-                    <div className="flex justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                    </div>
-                  ) : pendingInvitations?.length > 0 ? (
-                    <div className="space-y-4">
-                      {pendingInvitations.map((invite) => (
-                        <motion.div
-                          key={invite._id}
-                          whileHover={{ scale: 1.01 }}
-                          className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
-                        >
-                          <div className="flex items-center space-x-4">
-                            <Mail className="h-6 w-6 text-blue-400" />
-                            <div>
-                              <h3 className="font-medium text-white">{invite.email}</h3>
-                              <div className="flex items-center space-x-3 mt-1">
-                                <span className="text-sm text-gray-400">Invited as:</span>
-                                <RoleBadge role={invite.role} />
-                                <span className="text-sm text-gray-500">
-                                  • Sent {new Date(invite.createdAt).toLocaleDateString()}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleRespondToInvitation(invite._id, 'resend')}
-                              className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
-                            >
-                              <RefreshCw className="h-5 w-5" />
-                            </button>
-                            <button
-                              onClick={() => handleRespondToInvitation(invite._id, 'revoke')}
-                              className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                            >
-                              <X className="h-5 w-5" />
-                            </button>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  ) : (
+                  {!isInviting && (
                     <div className="text-center py-12">
-                      <Mail className="mx-auto h-12 w-12 text-gray-500" />
-                      <h3 className="mt-4 text-lg font-medium text-white">No Invites Available</h3>
-                      <p className="mt-1 text-gray-400">You haven't sent any invitations yet</p>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setIsInviting(true)}
-                        className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Create Invitation
-                      </motion.button>
+                      <UserPlus className="mx-auto h-12 w-12 text-gray-500" />
+                      <h3 className="mt-4 text-lg font-medium text-white">Invite New Members</h3>
+                      <p className="mt-1 text-gray-400">Use the button above to invite new members to your organization</p>
                     </div>
                   )}
                 </div>
               </div>
             )}
+
+            {/* Join Requests Tab */}
+{activeTab === 'requests' && (
+  <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-2xl font-bold text-white">Pending Join Requests</h2>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => dispatch(fetchJoinRequestsForOrg(orgId))}
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+          >
+            <RefreshCw className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      {requestsLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        </div>
+      ) : joinRequests?.length > 0 ? (
+        <div className="space-y-4">
+          {joinRequests.map((request) => (
+            <motion.div
+              key={request._id}
+              whileHover={{ scale: 1.01 }}
+              className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
+            >
+              <div className="flex items-center space-x-4">
+                <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
+                  {request.user?.firstName?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div>
+                  <h3 className="font-medium text-white">
+                    {request.user?.firstName && request.user?.lastName
+                      ? `${request.user.firstName} ${request.user.lastName}`
+                      : 'Unknown User'}
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    {request.user?.emailId || 'No email provided'}
+                  </p>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <RoleBadge role={request.role} />
+                    <span className="text-xs text-gray-500">
+                      Requested {new Date(request.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => handleRespondToJoinRequest(request._id, 'approve')}
+                  className="flex items-center px-4 py-2 bg-green-500/10 text-green-400 border border-green-500/20 rounded-lg hover:bg-green-500/20 transition-colors"
+                >
+                  <Check className="h-4 w-4 mr-1" /> Approve
+                </button>
+                <button
+                  onClick={() => handleRespondToJoinRequest(request._id, 'reject')}
+                  className="flex items-center px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors"
+                >
+                  <X className="h-4 w-4 mr-1" /> Reject
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <Clock className="mx-auto h-12 w-12 text-gray-500" />
+          <h3 className="mt-4 text-lg font-medium text-white">No Pending Requests</h3>
+          <p className="mt-1 text-gray-400">There are no pending requests to join your organization</p>
+        </div>
+      )}
+    </div>
+  </div>
+)}
           </motion.div>
         </AnimatePresence>
       </main>
