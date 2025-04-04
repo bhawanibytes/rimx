@@ -13,11 +13,8 @@ export const loginUser = async (credentials) => {
     localStorage.setItem('authToken', token);
     localStorage.setItem('userId', user.id); // Use user.id instead of userId
 
-    console.log("Token and userId stored in localStorage:", { token, userId: user.id }); // Debugging
-
     return response.data;
   } catch (error) {
-    console.error("Error during login:", error.message); // Debugging log
     throw new Error(
       error.response?.data?.message || 'Login failed. Please check your credentials.'
     );

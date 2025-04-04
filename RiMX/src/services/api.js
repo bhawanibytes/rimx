@@ -7,7 +7,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
-
+const user = localStorage.getItem('userId'); 
 // Request interceptor for auth token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('authToken');
@@ -66,15 +66,12 @@ export const createOrganization = async (orgData) => {
     }
 
     const payload = { ...orgData, userId };
-    console.log("Payload being sent to createOrganization:", payload);
 
     const response = await api.post('/v1/org/organizations', payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
-
-    console.log("Create Organization Response:", response.data);
 
     if (!response.data.organization?.id) {
       throw new Error("Organization ID is missing in the response.");
@@ -83,7 +80,6 @@ export const createOrganization = async (orgData) => {
     // Store the organization ID in localStorage
     const orgId = response.data.organization.id;
     localStorage.setItem('orgId', orgId);
-    console.log("Organization ID stored in localStorage:", orgId);
 
     return response.data;
   } catch (error) {
@@ -108,9 +104,7 @@ export const fetchUserOrganizations = async (userId) => {
 
 export const getOrganizationDetails = async (orgId) => {
   try {
-    console.log("API call to fetch organization details for orgId:", orgId); // Debugging log
     const response = await api.get(`/v1/org/organizations/${orgId}`);
-    console.log("API response:", response.data); // Debugging log
     return response.data.organization; // Return the organization object
   } catch (error) {
     console.error("Error fetching organization details:", error.response?.data || error.message);
@@ -138,7 +132,6 @@ export const deleteOrganization = async (orgId) => {
 };
 
 export const updateOrganization = async (orgId, updatedData) => {
-  console.log('Updating organization with ID:', orgId); // Debugging log
   if (!orgId) {
     throw new Error('Organization ID is missing. Cannot update organization.');
   }
@@ -150,7 +143,6 @@ export const updateOrganization = async (orgId, updatedData) => {
         Authorization: `Bearer ${token}`, // Include the token in the Authorization header
       },
     });
-    console.log('Update Organization Response:', response.data); // Debugging log
     return response.data;
   } catch (error) {
     console.error('Error updating organization:', error.response?.data || error.message);
@@ -161,26 +153,49 @@ export const updateOrganization = async (orgId, updatedData) => {
 };
 
 // Invitations API
-export const fetchPendingInvitations = async (userId) => {
+export const createInvitation = async (orgId, email, role) => {
   try {
-    const response = await api.get(`/v1/org/invitations/pending?userId=${userId}`);
+    console.log('Payload being sent to backend:', {orgId, email, role });
+    const token = Math.random().toString(36).substring(2, 15); // Example token generation
+    const expiresAt = Math.random() * 1000 * 60 * 60 * 24 * 7; // 1 week in milliseconds
+    console.log('Payload being sent:', { orgId, email, role }); // Debugging log
+    const response = await api.post(`/v1/org/organizations/${orgId}/invitations`, {
+      orgId,
+      email,
+      role,token,invitedBy:user,
+      expiresAt
+    });
     return response.data;
   } catch (error) {
+    console.error('Error creating invitation:', error.response?.data || error.message);
     throw new Error(
-      error.response?.data?.message || 
-      'Failed to fetch invitations. Please try again.'
+      error.response?.data?.message || 'Failed to create invitation. Please try again.'
     );
   }
 };
 
-export const respondToInvitation = async (inviteId, accept) => {
+export const fetchPendingInvitations = async (orgId) => {
   try {
-    const response = await api.post(`/v1/org/invitations/${inviteId}/respond`, { accept });
+    const response = await api.get(`/v1/org/organizations/${orgId}/invitations?status=pending`);
     return response.data;
   } catch (error) {
+    console.error('Error fetching pending invitations:', error.response?.data || error.message);
     throw new Error(
-      error.response?.data?.message || 
-      'Failed to process invitation. Please try again.'
+      error.response?.data?.message || 'Failed to fetch pending invitations. Please try again.'
+    );
+  }
+};
+
+export const respondToInvitation = async (invitationId, accept) => {
+  try {
+    const response = await api.patch(`/v1/org/invitations/${invitationId}/respond`, {
+      accept,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error responding to invitation:', error.response?.data || error.message);
+    throw new Error(
+      error.response?.data?.message || 'Failed to respond to invitation. Please try again.'
     );
   }
 };

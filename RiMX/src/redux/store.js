@@ -15,6 +15,7 @@ import organizationReducer from '../features/organization/organizationSlice';
 import invitationReducer from '../features/invitation/invitationSlice';
 import membershipReducer from '../features/membership/membershipSlice';
 import roleReducer from '../features/roles/roleSlice';
+import joinRequestSlice from '../features/joinRequest/joinRequestSlice';
 export const store = configureStore({
   reducer: {
     auth: authReducer,
@@ -22,5 +23,6 @@ export const store = configureStore({
     invitations: invitationReducer,
     memberships: membershipReducer,
     roles: roleReducer,
+    joinRequests: joinRequestSlice,
   },
 });
