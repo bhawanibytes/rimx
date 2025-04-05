@@ -15,11 +15,17 @@ const initialState = {
 };
 
 // Thunks
+// Thunk to fetch user's organizations (owner or member)
 export const fetchUserOrganizations = createAsyncThunk(
-  'organizations/fetchUser',
-  async (_, { getState }) => {
-    const { auth } = getState();
-    return await fetchUserOrgsAPI(auth.user.id);
+  'organizations/fetchUserOrganizations',
+  async (orgId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(`/v1/org/organizations/${orgId}/myOrganizations`);
+      return response.data.organizations; // Return the list of organizations
+    } catch (error) {
+      console.error('Error fetching user organizations:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch user organizations.');
+    }
   }
 );
 
@@ -139,11 +145,11 @@ const organizationSlice = createSlice({
       })
       .addCase(fetchUserOrganizations.fulfilled, (state, action) => {
         state.loading = false;
-        state.userOrganizations = action.payload;
+        state.userOrganizations = action.payload; // Store the fetched organizations
       })
       .addCase(fetchUserOrganizations.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message;
+        state.error = action.payload || action.error.message;
       })
       
       // Fetch Organization Details

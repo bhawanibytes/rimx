@@ -14,7 +14,7 @@ const membershipSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: {
-      values: ['admin', 'projectManager', 'employee'],
+      values: ['admin', 'projectManager', 'employee', 'teamLead', 'member'],
       message: 'Invalid role specified'
     },
     default: 'employee'
@@ -23,7 +23,7 @@ const membershipSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  invitedBy: {
+  approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },

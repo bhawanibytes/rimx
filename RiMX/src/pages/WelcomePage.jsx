@@ -13,10 +13,10 @@ import {
   Loader2,
   LayoutDashboard,
   Eye,
+  Clock,
 } from "lucide-react";
 import {
   fetchUserOrganizations,
-  fetchOrganizationDetails,
   fetchAllOrganizations,
   createOrganization,
   clearOrganizationError,
@@ -32,7 +32,7 @@ const WelcomePage = () => {
   const [selectedRole, setSelectedRole] = useState("member");
   const [showRoleDropdown, setShowRoleDropdown] = useState(null);
   const [message, setMessage] = useState({ text: "", isSuccess: false });
-  const [requestedOrgs, setRequestedOrgs] = useState([]); // Track which orgs have requests
+  const [requestedOrgs, setRequestedOrgs] = useState([]);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const orgId = localStorage.getItem("orgId");
@@ -52,30 +52,21 @@ const WelcomePage = () => {
   } = useSelector((state) => state.invitations);
   const { error: joinRequestError } = useSelector((state) => state.joinRequests);
 
+  // Check if user owns any organizations
+  const userOwnsOrganization = userOrganizations?.some(org => org.role === 'owner');
+
   // Fetch data based on active tab
   useEffect(() => {
     if (activeTab === "organizations") {
-      dispatch(fetchUserOrganizations());
+      dispatch(fetchUserOrganizations(orgId));
     } else if (activeTab === "invitations") {
-      if (orgId) {
-        dispatch(fetchPendingInvitations(orgId)); // Pass orgId here
-      } else {
-        console.error("Organization ID is not set in localStorage.");
+      if (user?.id) {
+        dispatch(fetchPendingInvitations(user.id));
       }
     } else if (activeTab === "join") {
       dispatch(fetchAllOrganizations());
     }
-  }, [activeTab, dispatch, orgId]);
-
-  useEffect(() => {
-    if (activeTab === 'invitations') {
-      if (user && user.id) {
-        dispatch(fetchPendingInvitations(user.id)); // Pass userId here
-      } else {
-        console.error('User ID is not available.');
-      }
-    }
-  }, [activeTab, dispatch, user]);
+  }, [activeTab, dispatch, user?.id, orgId]);
 
   // Clear organization error when unmounting
   useEffect(() => {
@@ -85,24 +76,22 @@ const WelcomePage = () => {
   }, [dispatch]);
 
   // Show join request errors if they exist
-useEffect(() => {
-  if (joinRequestError) {
-    // Handle both string and object error formats
-    const errorMessage = typeof joinRequestError === 'string' 
-      ? joinRequestError 
-      : joinRequestError.message || 'Request failed';
-    
-    showMessage(errorMessage, false);
-    
-    // If the error indicates a request already exists, add to requestedOrgs
-    if (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes("already requested")) {
-      const orgId = errorMessage.match(/organization (\w+)/)?.[1];
-      if (orgId) {
-        setRequestedOrgs(prev => [...prev, orgId]);
+  useEffect(() => {
+    if (joinRequestError) {
+      const errorMessage = typeof joinRequestError === 'string' 
+        ? joinRequestError 
+        : joinRequestError.message || 'Request failed';
+      
+      showMessage(errorMessage, false);
+      
+      if (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes("already requested")) {
+        const orgId = errorMessage.match(/organization (\w+)/)?.[1];
+        if (orgId) {
+          setRequestedOrgs(prev => [...prev, orgId]);
+        }
       }
     }
-  }
-}, [joinRequestError]);
+  }, [joinRequestError]);
 
   // Show message and auto-hide after 3 seconds
   const showMessage = (text, isSuccess = true) => {
@@ -132,23 +121,29 @@ useEffect(() => {
 
   // Handle organization actions
   const handleOrgAction = (orgId, action) => {
-    if (action === "dashboard") {
-      navigate(`/org/${orgId}/dashboard`);
-      showMessage("Redirecting to organization dashboard...");
-    } else {
-      navigate(`/OrganizationDashboard`);
-      showMessage("Showing organization overview...");
+    if (action === 'overview') {
+      localStorage.setItem('orgId', orgId);
+      navigate('/OrganizationDashboard');
     }
   };
 
   // Handle invitation responses
   const handleRespondToInvite = async (inviteId, accept) => {
     try {
-      await dispatch(respondToInvitation({ inviteId, accept })).unwrap();
-      showMessage(`Invitation ${accept ? "accepted" : "rejected"} successfully!`);
-      dispatch(fetchPendingInvitations());
+      const response = await dispatch(
+        respondToInvitation({ invitationId: inviteId, accept })
+      ).unwrap();
+      
+      showMessage(`Invitation ${accept ? 'accepted' : 'rejected'} successfully!`);
+      
+      if (user?.id) {
+        dispatch(fetchPendingInvitations(user.id));
+      }
     } catch (error) {
-      showMessage(`Failed to ${accept ? "accept" : "reject"} invitation!`, false);
+      showMessage(
+        error?.message || `Failed to ${accept ? 'accept' : 'reject'} invitation!`, 
+        false
+      );
     }
   };
 
@@ -170,14 +165,12 @@ useEffect(() => {
         showMessage(response?.message || 'Failed to send join request!', false);
       }
     } catch (error) {
-      // Handle both string and object error formats
       const errorMessage = typeof error === 'string' 
         ? error 
         : error?.message || 'Failed to send join request!';
       
       showMessage(errorMessage, false);
         
-      // If error indicates request already exists, update requestedOrgs
       if (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes("already requested")) {
         setRequestedOrgs(prev => [...prev, orgId]);
       }
@@ -200,6 +193,141 @@ useEffect(() => {
     );
   };
 
+  const InvitationCard = ({ invite, onRespond }) => {
+    const [responseStatus, setResponseStatus] = useState(null);
+    const [isResponding, setIsResponding] = useState(false);
+    const orgName = invite.organizationName || 'Unknown Organization';
+    const inviterName = invite.inviterName || 'Unknown User';
+
+    const handleResponse = async (accept) => {
+      setIsResponding(true);
+      try {
+        await onRespond(invite._id, accept);
+        setResponseStatus(accept ? 'accepted' : 'rejected');
+      } finally {
+        setIsResponding(false);
+      }
+    };
+
+    // If we've already responded, show the status
+    if (responseStatus || invite.status !== 'pending') {
+      const status = responseStatus || invite.status;
+      return (
+        <motion.div
+          whileHover={{ scale: 1.01 }}
+          className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
+        >
+          <div className="flex items-center space-x-4">
+            <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
+              {orgName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <h3 className="font-medium text-white">{orgName}</h3>
+              <p className="text-sm text-gray-400">
+                Invited as: <RoleBadge role={invite.role} />
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                From: {inviterName}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center">
+            <span className={`px-4 py-2 rounded-lg ${
+              status === 'accepted'
+                ? "bg-green-600/10 text-green-400 border border-green-600/20"
+                : "bg-red-600/10 text-red-400 border border-red-600/20"
+            }`}>
+              {status === 'accepted' ? "Accepted" : "Rejected"}
+            </span>
+          </div>
+        </motion.div>
+      );
+    }
+
+    return (
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
+      >
+        <div className="flex items-center space-x-4">
+          <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
+            {orgName.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h3 className="font-medium text-white">{orgName}</h3>
+            <p className="text-sm text-gray-400">
+              Invited as: <RoleBadge role={invite.role} />
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              From: {inviterName}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex space-x-2">
+          {isResponding ? (
+            <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+          ) : (
+            <>
+              <button
+                onClick={() => handleResponse(true)}
+                className="flex items-center px-4 py-2 bg-green-600/10 text-green-400 border border-green-600/20 rounded-lg hover:bg-green-600/20 transition-colors"
+              >
+                <Check className="h-4 w-4 mr-1" /> Accept
+              </button>
+              <button
+                onClick={() => handleResponse(false)}
+                className="flex items-center px-4 py-2 bg-red-600/10 text-red-400 border border-red-600/20 rounded-lg hover:bg-red-600/20 transition-colors"
+              >
+                <X className="h-4 w-4 mr-1" /> Reject
+              </button>
+            </>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
+
+  const InvitationActivityCard = ({ invite }) => {
+    const orgName = invite.organizationName || 'Unknown Organization';
+    const inviterName = invite.inviterName || 'Unknown User';
+    const isAccepted = invite.status === 'accepted';
+    const date = new Date(invite.updatedAt || Date.now()).toLocaleString();
+
+    return (
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
+      >
+        <div className="flex items-center space-x-4">
+          <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
+            {orgName.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h3 className="font-medium text-white">{orgName}</h3>
+            <p className="text-sm text-gray-400">
+              Invited as: <RoleBadge role={invite.role} />
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              From: {inviterName} • {date}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center">
+          <span className={`px-4 py-2 rounded-lg ${
+            isAccepted 
+              ? "bg-green-600/10 text-green-400 border border-green-600/20"
+              : "bg-red-600/10 text-red-400 border border-red-600/20"
+          }`}>
+            {isAccepted ? "Accepted" : "Rejected"}
+          </span>
+        </div>
+      </motion.div>
+    );
+  };
+
   const CreateOrganizationCard = () => (
     <motion.div 
       whileHover={{ scale: 1.01 }}
@@ -218,6 +346,38 @@ useEffect(() => {
       )}
     </motion.div>
   );
+
+  const RequestedOrganizationCard = ({ org }) => {
+    const date = new Date().toLocaleString();
+    
+    return (
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
+      >
+        <div className="flex items-center space-x-4">
+          <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
+            {org.name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h3 className="font-medium text-white">{org.name}</h3>
+            <p className="text-sm text-gray-400">
+              Requested as: <RoleBadge role={selectedRole} />
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Requested on: {date}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center">
+          <span className="px-4 py-2 bg-yellow-600/10 text-yellow-400 border border-yellow-600/20 rounded-lg">
+            Pending Approval
+          </span>
+        </div>
+      </motion.div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 text-white">
@@ -242,8 +402,8 @@ useEffect(() => {
           </div>
           <button
             onClick={handleCreateOrg}
-            disabled={orgLoading}
-            className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors disabled:opacity-50"
+            disabled={orgLoading || userOwnsOrganization}
+            className={`flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors ${userOwnsOrganization ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <PlusCircle className="h-5 w-5 mr-2" />
             {orgLoading ? "Creating..." : "New Organization"}
@@ -313,7 +473,7 @@ useEffect(() => {
                     <h2 className="text-2xl font-bold text-white">My Organizations</h2>
                     <div className="flex space-x-3">
                       <button
-                        onClick={() => dispatch(fetchUserOrganizations())}
+                        onClick={() => dispatch(fetchUserOrganizations(orgId))}
                         className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
                       >
                         <RefreshCw className="h-5 w-5" />
@@ -327,12 +487,13 @@ useEffect(() => {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <CreateOrganizationCard />
+                      {/* Only show create org card if user doesn't own any orgs */}
+                      {!userOwnsOrganization && <CreateOrganizationCard />}
                       
                       {userOrganizations?.length > 0 ? (
                         userOrganizations.map((org) => (
                           <motion.div
-                            key={org.id}
+                            key={org._id}
                             whileHover={{ scale: 1.01 }}
                             className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
                           >
@@ -343,23 +504,22 @@ useEffect(() => {
                               <div>
                                 <h3 className="font-medium text-white">{org.name}</h3>
                                 <p className="text-sm text-gray-400">
-                                  {org.role ? <RoleBadge role={org.role} /> : "Member"}
+                                  {org.role ? <RoleBadge role={org.role} /> : 'Member'}
                                 </p>
                               </div>
                             </div>
                             <div className="flex space-x-2">
                               <button
-                                onClick={() => handleOrgAction(org.id, "dashboard")}
+                                onClick={() => handleOrgAction(org._id, 'dashboard')}
                                 className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
                               >
                                 <LayoutDashboard className="h-4 w-4 mr-1" />
                                 Dashboard
                               </button>
                               <button
-                                onClick={() => handleOrgAction(org.id, "overview")}
-                                className="flex items-center px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors"
+                                onClick={() => handleOrgAction(org._id, 'overview')}
+                                className="text-blue-500 hover:underline"
                               >
-                                <Eye className="h-4 w-4 mr-1" />
                                 Overview
                               </button>
                             </div>
@@ -379,82 +539,79 @@ useEffect(() => {
             )}
 
             {/* Invitations Tab */}
-{/* Invitations Tab */}
-{activeTab === "invitations" && (
-  <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-bold text-white">Pending Invitations</h2>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => user?.id && dispatch(fetchPendingInvitations(user.id))}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
-          >
-            <RefreshCw className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
+            {activeTab === "invitations" && (
+              <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">
+                <div className="p-8">
+                  <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-2xl font-bold text-white">Invitations</h2>
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => user?.id && dispatch(fetchPendingInvitations(user.id))}
+                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+                      >
+                        <RefreshCw className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </div>
 
-      {invitesLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        </div>
-      ) : pendingInvitations?.length > 0 ? (
-        <div className="space-y-4">
-          {pendingInvitations.map((invite) => {
-            // Safely access nested properties
-            const orgName = invite.organizationName|| 'Unknown Organization';
-            const inviterName = invite.inviterName || 'Unknown User';
-            
-            return (
-              <motion.div
-                key={invite._id}
-                whileHover={{ scale: 1.01 }}
-                className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
-                    {orgName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-white">{orgName}</h3>
-                    <p className="text-sm text-gray-400">
-                      Invited as: <RoleBadge role={invite.role} />
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      From: {inviterName}
-                    </p>
-                  </div>
+                  {invitesLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Pending Invitations Section */}
+                      <div className="mb-12">
+                        <h3 className="text-lg font-medium text-white mb-4">Pending Invitations</h3>
+                        {pendingInvitations?.filter(invite => invite.status === 'pending').length > 0 ? (
+                          <div className="space-y-4">
+                            {pendingInvitations
+                              .filter(invite => invite.status === 'pending')
+                              .map((invite) => (
+                                <InvitationCard 
+                                  key={invite._id} 
+                                  invite={invite} 
+                                  onRespond={handleRespondToInvite} 
+                                />
+                              ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 border border-gray-700 rounded-lg">
+                            <Mail className="mx-auto h-12 w-12 text-gray-500" />
+                            <h3 className="mt-4 text-lg font-medium text-white">No Pending Invitations</h3>
+                            <p className="mt-1 text-gray-400">You don't have any pending invitations</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Recent Activities Section */}
+                      <div>
+                        <h3 className="text-lg font-medium text-white mb-4">Recent Activities</h3>
+                        {pendingInvitations?.filter(invite => invite.status !== 'pending').length > 0 ? (
+                          <div className="space-y-4">
+                            {pendingInvitations
+                              .filter(invite => invite.status !== 'pending')
+                              .map((invite) => (
+                                <InvitationActivityCard 
+                                  key={invite._id} 
+                                  invite={invite} 
+                                />
+                              ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 border border-gray-700 rounded-lg">
+                            <Mail className="mx-auto h-12 w-12 text-gray-500" />
+                            <h3 className="mt-4 text-lg font-medium text-white">No Recent Activities</h3>
+                            <p className="mt-1 text-gray-400">Your invitation responses will appear here</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
-                
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleRespondToInvite(invite._id, true)}
-                    className="flex items-center px-4 py-2 bg-green-600/10 text-green-400 border border-green-600/20 rounded-lg hover:bg-green-600/20 transition-colors"
-                  >
-                    <Check className="h-4 w-4 mr-1" /> Accept
-                  </button>
-                  <button
-                    onClick={() => handleRespondToInvite(invite._id, false)}
-                    className="flex items-center px-4 py-2 bg-red-600/10 text-red-400 border border-red-600/20 rounded-lg hover:bg-red-600/20 transition-colors"
-                  >
-                    <X className="h-4 w-4 mr-1" /> Reject
-                  </button>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <Mail className="mx-auto h-12 w-12 text-gray-500" />
-          <h3 className="mt-4 text-lg font-medium text-white">No Pending Invitations</h3>
-          <p className="mt-1 text-gray-400">You don't have any organization invitations</p>
-        </div>
-      )}
-    </div>
-  </div>
-)}
+              </div>
+            )}
+
             {/* Join Organizations Tab */}
             {activeTab === "join" && (
               <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">
@@ -475,75 +632,97 @@ useEffect(() => {
                     <div className="flex justify-center py-12">
                       <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                     </div>
-                  ) : joinableOrganizations?.length > 0 ? (
-                    <div className="space-y-4">
-                      {joinableOrganizations.map((org) => (
-                        <motion.div
-                          key={org._id}
-                          whileHover={{ scale: 1.01 }}
-                          className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
-                        >
-                          <div className="flex items-center space-x-4">
-                            <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
-                              {org.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <h3 className="font-medium text-white">{org.name}</h3>
-                              <p className="text-sm text-gray-400">
-                                Created {new Date(org.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-4">
-                            {showRoleDropdown === org._id ? (
-                              <div className="flex space-x-2">
-                                <select
-                                  value={selectedRole}
-                                  onChange={(e) => setSelectedRole(e.target.value)}
-                                  className="px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                                >
-                                  <option value="member">Member</option>
-                                  <option value="projectManager">Project Manager</option>
-                                  <option value="teamLead">Team Lead</option>
-                                </select>
-                                <button
-                                  onClick={() => handleJoinRequest(org._id)}
-                                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
-                                >
-                                  Send Request
-                                </button>
-                                <button
-                                  onClick={() => setShowRoleDropdown(null)}
-                                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
-                                >
-                                  <X className="h-5 w-5" />
-                                </button>
-                              </div>
-                            ) : requestedOrgs.includes(org._id) ? (
-                              <button
-                                disabled
-                                className="px-4 py-2 bg-gray-600/50 text-gray-300 rounded-lg cursor-not-allowed"
-                              >
-                                Request Sent
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => setShowRoleDropdown(org._id)}
-                                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
-                              >
-                                Join
-                              </button>
-                            )}
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
                   ) : (
-                    <div className="text-center py-12">
-                      <UserPlus className="mx-auto h-12 w-12 text-gray-500" />
-                      <h3 className="mt-4 text-lg font-medium text-white">No Organizations Available</h3>
-                      <p className="mt-1 text-gray-400">There are no organizations available to join right now</p>
-                    </div>
+                    <>
+                      {/* Requested Organizations Section */}
+                      {requestedOrgs.length > 0 && (
+                        <div className="mb-8">
+                          <h3 className="text-lg font-medium text-white mb-4 flex items-center">
+                            <Clock className="h-5 w-5 mr-2" /> Your Requests
+                          </h3>
+                          <div className="space-y-4">
+                            {joinableOrganizations
+                              ?.filter(org => requestedOrgs.includes(org._id))
+                              .map(org => (
+                                <RequestedOrganizationCard 
+                                  key={org._id} 
+                                  org={org} 
+                                />
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Available Organizations Section */}
+                      <div>
+                        <h3 className="text-lg font-medium text-white mb-4">Available Organizations</h3>
+                        {joinableOrganizations?.length > 0 ? (
+                          <div className="space-y-4">
+                            {joinableOrganizations
+                              ?.filter(org => !requestedOrgs.includes(org._id))
+                              .map((org) => (
+                                <motion.div
+                                  key={org._id}
+                                  whileHover={{ scale: 1.01 }}
+                                  className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
+                                >
+                                  <div className="flex items-center space-x-4">
+                                    <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
+                                      {org.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                      <h3 className="font-medium text-white">{org.name}</h3>
+                                      <p className="text-sm text-gray-400">
+                                        Created {new Date(org.createdAt).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-4">
+                                    {showRoleDropdown === org._id ? (
+                                      <div className="flex space-x-2">
+                                        <select
+                                          value={selectedRole}
+                                          onChange={(e) => setSelectedRole(e.target.value)}
+                                          className="px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                        >
+                                          <option value="member">Member</option>
+                                          <option value="projectManager">Project Manager</option>
+                                          <option value="teamLead">Team Lead</option>
+                                        </select>
+                                        <button
+                                          onClick={() => handleJoinRequest(org._id)}
+                                          className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
+                                        >
+                                          Send Request
+                                        </button>
+                                        <button
+                                          onClick={() => setShowRoleDropdown(null)}
+                                          className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+                                        >
+                                          <X className="h-5 w-5" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => setShowRoleDropdown(org._id)}
+                                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
+                                      >
+                                        Join
+                                      </button>
+                                    )}
+                                  </div>
+                                </motion.div>
+                              ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-12">
+                            <UserPlus className="mx-auto h-12 w-12 text-gray-500" />
+                            <h3 className="mt-4 text-lg font-medium text-white">No Organizations Available</h3>
+                            <p className="mt-1 text-gray-400">There are no organizations available to join right now</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

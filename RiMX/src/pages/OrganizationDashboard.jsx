@@ -19,6 +19,11 @@ import {
   MoreVertical,
   ArrowLeft,
   Clock,
+  Settings,
+  User,
+  Shield,
+  Briefcase,
+  LogOut,
 } from 'lucide-react';
 import {
   fetchOrganizationDetails,
@@ -42,10 +47,11 @@ const OrganizationDashboard = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(null);
-  const [showMemberMenu, setShowMemberMenu] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState(false);
   const [inviteError, setInviteError] = useState(null);
+  const [apiStatus, setApiStatus] = useState({ type: null, message: null });
+  const [redirectMessage, setRedirectMessage] = useState(false);
 
   // Redux state
   const { currentOrganization, loading: orgLoading, error } = useSelector(
@@ -57,6 +63,9 @@ const OrganizationDashboard = () => {
   const { joinRequests, loading: requestsLoading } = useSelector(
     (state) => state.joinRequests
   );
+  
+  // Check if current user is the owner
+  const isOwner = currentOrganization?.owner?.id === userId;
 
   // Local state
   const [inviteEmail, setInviteEmail] = useState('');
@@ -67,6 +76,7 @@ const OrganizationDashboard = () => {
   // Fetch data
   useEffect(() => {
     if (!orgId) {
+      console.error('Organization ID is not defined.');
       navigate('/organizations');
       return;
     }
@@ -80,7 +90,7 @@ const OrganizationDashboard = () => {
           await dispatch(fetchJoinRequestsForOrg(orgId)).unwrap();
         }
       } catch (error) {
-        console.error("Error:", error.message);
+        console.error('Error:', error.message);
       }
     };
 
@@ -103,14 +113,15 @@ const OrganizationDashboard = () => {
 
   // Reset messages after 3 seconds
   useEffect(() => {
-    if (inviteSuccess || inviteError) {
+    if (inviteSuccess || inviteError || apiStatus.message) {
       const timer = setTimeout(() => {
         setInviteSuccess(false);
         setInviteError(null);
+        setApiStatus({ type: null, message: null });
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [inviteSuccess, inviteError]);
+  }, [inviteSuccess, inviteError, apiStatus]);
 
   // Organization actions
   const handleDeleteOrg = async () => {
@@ -119,12 +130,13 @@ const OrganizationDashboard = () => {
       navigate('/organizations');
     } catch (error) {
       console.error('Error:', error.message);
+      setApiStatus({ type: 'error', message: error.message });
     }
   };
 
   const handleUpdateOrg = async () => {
     if (!updatedName.trim()) {
-      alert('Organization name cannot be empty.');
+      setApiStatus({ type: 'error', message: 'Organization name cannot be empty.' });
       return;
     }
     try {
@@ -133,15 +145,20 @@ const OrganizationDashboard = () => {
         updatedData: { name: updatedName, description: updatedDescription },
       })).unwrap();
       setIsEditing(false);
+      setApiStatus({ type: 'success', message: 'Organization updated successfully!' });
     } catch (error) {
       console.error('Error:', error.message);
+      setApiStatus({ type: 'error', message: error.message });
     }
   };
 
   // Member actions
   const handleInviteUser = async (e) => {
     e.preventDefault();
-    if (!inviteEmail.trim()) return;
+    if (!inviteEmail.trim()) {
+      setInviteError('Please enter a valid email address');
+      return;
+    }
     
     setInviteError(null);
     setInviteSuccess(false);
@@ -169,55 +186,131 @@ const OrganizationDashboard = () => {
   const handleUpdateMemberRole = async (memberId, newRole) => {
     try {
       await dispatch(updateMemberRole({
-        organizationId: orgId,
+        orgId,
         memberId,
         newRole,
       })).unwrap();
       setShowRoleDropdown(null);
       await dispatch(fetchMembers(orgId));
+      setApiStatus({ type: 'success', message: 'Member role updated successfully!' });
     } catch (error) {
       console.error('Error:', error.message);
+      setApiStatus({ type: 'error', message: error.message });
     }
   };
 
   const handleRemoveMember = async (memberId) => {
-    if (window.confirm('Are you sure you want to remove this member?')) {
-      try {
-        await dispatch(removeMember({
-          organizationId: orgId,
-          memberId,
-        })).unwrap();
-        await dispatch(fetchMembers(orgId));
-      } catch (error) {
-        console.error('Error:', error.message);
-      }
+    try {
+      await dispatch(removeMember({
+        orgId,
+        memberId,
+      })).unwrap();
+      await dispatch(fetchMembers(orgId));
+      setApiStatus({ type: 'success', message: 'Member removed successfully!' });
+    } catch (error) {
+      console.error('Error:', error.message);
+      setApiStatus({ type: 'error', message: error.message });
     }
   };
 
-  const handleRespondToJoinRequest = async (requestId, response) => {
+  const handleRespondToJoinRequest = async (requestId, action) => {
     try {
-      await dispatch(respondToJoinRequest({
-        requestId,
-        response,
-      })).unwrap();
-      await dispatch(fetchJoinRequestsForOrg(orgId));
+      await dispatch(
+        respondToJoinRequest({
+          orgId,
+          requestId,
+          response: action,
+        })
+      ).unwrap();
+
+      setApiStatus({
+        type: 'success',
+        message: action === 'approve' 
+          ? 'Join request approved successfully!' 
+          : 'Join request rejected successfully!'
+      });
+
+      dispatch(fetchJoinRequestsForOrg(orgId));
     } catch (error) {
-      console.error('Error:', error.message);
+      setApiStatus({ type: 'error', message: error || 'Failed to respond to join request.' });
     }
   };
 
   // UI Components
   const RoleBadge = ({ role }) => {
+    const roleIcons = {
+      owner: <Shield className="h-4 w-4" />,
+      admin: <Settings className="h-4 w-4" />,
+      projectManager: <Briefcase className="h-4 w-4" />,
+      member: <User className="h-4 w-4" />,
+    };
+
     const roleColors = {
       owner: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
       admin: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+      projectManager: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
       member: 'bg-green-500/10 text-green-400 border-green-500/30',
     };
+
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${roleColors[role] || 'bg-gray-500/10 text-gray-400 border-gray-500/30'}`}>
-        {role.charAt(0).toUpperCase() + role.slice(1)}
-      </span>
+      <div className={`flex items-center px-3 py-1 rounded-full text-xs font-medium border ${roleColors[role] || 'bg-gray-500/10 text-gray-400 border-gray-500/30'}`}>
+        {roleIcons[role] || <User className="h-4 w-4" />}
+        <span className="ml-2">{role.charAt(0).toUpperCase() + role.slice(1)}</span>
+      </div>
     );
+  };
+
+  const StatusMessage = () => {
+    if (!apiStatus.message) return null;
+    
+    const bgColor = apiStatus.type === 'success' 
+      ? 'bg-green-500/10 border-green-500/20 text-green-400' 
+      : 'bg-red-500/10 border-red-500/20 text-red-400';
+    
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`mb-6 p-4 rounded-lg border ${bgColor} flex items-center`}
+      >
+        {apiStatus.type === 'success' ? (
+          <Check className="h-5 w-5 mr-3 flex-shrink-0" />
+        ) : (
+          <X className="h-5 w-5 mr-3 flex-shrink-0" />
+        )}
+        <span>{apiStatus.message}</span>
+      </motion.div>
+    );
+  };
+
+  const InviteStatusMessage = () => {
+    if (inviteSuccess) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 bg-green-500/10 text-green-400 rounded-lg border border-green-500/20 flex items-center"
+        >
+          <Check className="h-5 w-5 mr-3 flex-shrink-0" />
+          <span>Invitation sent successfully!</span>
+        </motion.div>
+      );
+    }
+
+    if (inviteError) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20 flex items-center"
+        >
+          <X className="h-5 w-5 mr-3 flex-shrink-0" />
+          <span>{inviteError}</span>
+        </motion.div>
+      );
+    }
+
+    return null;
   };
 
   if (orgLoading) {
@@ -251,11 +344,11 @@ const OrganizationDashboard = () => {
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className="bg-gray-800/50 border-b border-gray-700 backdrop-blur-sm"
+        className="bg-gray-800/50 border-b border-gray-700 backdrop-blur-sm sticky top-0 z-10"
       >
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link to="/" className="text-blue-400 hover:text-blue-300">
+            <Link to="/WelcomePage" className="text-blue-400 hover:text-blue-300 transition-colors">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
@@ -276,7 +369,7 @@ const OrganizationDashboard = () => {
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </button>
-            {currentOrganization.owner?.id === userId && (
+            {isOwner ? (
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 className="flex items-center px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors"
@@ -284,10 +377,32 @@ const OrganizationDashboard = () => {
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
               </button>
+            ) : (
+              <button
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to leave this organization?')) {
+                    handleRemoveMember(userId); // Assuming `userId` is the current user's ID
+                    setRedirectMessage(true); // Show the redirect message
+                    setTimeout(() => {
+                      navigate('/WelcomePage'); // Redirect after 2 seconds
+                    }, 2000);
+                  }
+                }}
+                className="flex items-center px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Leave
+              </button>
             )}
           </div>
         </div>
       </motion.header>
+
+      {redirectMessage && (
+        <div className="fixed top-0 left-0 w-full bg-green-500/10 text-green-400 border border-green-500/20 p-4 text-center">
+          Left! Redirecting to WelcomePage...
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
@@ -328,19 +443,19 @@ const OrganizationDashboard = () => {
       </AnimatePresence>
 
       {/* Navigation */}
-      <nav className="bg-gray-800/50 border-b border-gray-700 backdrop-blur-sm">
+      <nav className="bg-gray-800/50 border-b border-gray-700 backdrop-blur-sm sticky top-16 z-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex space-x-8">
             {[
               { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
               { id: 'members', icon: Users, label: 'Members' },
-              { id: 'invite', icon: UserPlus, label: 'Invite Members' },
-              { id: 'requests', icon: Clock, label: 'Join Requests' },
+              { id: 'invite', icon: UserPlus, label: 'Invite' },
+              { id: 'requests', icon: Clock, label: 'Requests' },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center py-3 px-1 border-b-2 font-medium text-sm ${
+                className={`flex items-center py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-white'
                     : 'border-transparent text-gray-400 hover:text-white hover:border-gray-500'
@@ -356,6 +471,7 @@ const OrganizationDashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
+        <StatusMessage />
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -372,7 +488,7 @@ const OrganizationDashboard = () => {
                     <h2 className="text-2xl font-bold text-white">Organization Details</h2>
                     <button
                       onClick={() => setIsEditing(!isEditing)}
-                      className="flex items-center text-blue-400 hover:text-blue-300"
+                      className="flex items-center text-blue-400 hover:text-blue-300 transition-colors"
                     >
                       {isEditing ? (
                         <>
@@ -449,7 +565,10 @@ const OrganizationDashboard = () => {
                             <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
                               {currentOrganization.owner?.name?.charAt(0) || 'O'}
                             </div>
-                            <p className="text-white">{currentOrganization.owner?.name || 'N/A'}</p>
+                            <div>
+                              <p className="text-white">{currentOrganization.owner?.name || 'N/A'}</p>
+                              <p className="text-xs text-gray-400">{currentOrganization.owner?.email || ''}</p>
+                            </div>
                           </div>
                         </div>
                         <div>
@@ -483,18 +602,21 @@ const OrganizationDashboard = () => {
                       <button
                         onClick={() => dispatch(fetchMembers(orgId))}
                         className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+                        title="Refresh members"
                       >
                         <RefreshCw className="h-5 w-5" />
                       </button>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleAddMembersClick}
-                        className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
-                      >
-                        <Plus className="h-5 w-5 mr-2" />
-                        Add Members
-                      </motion.button>
+                      {isOwner && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={handleAddMembersClick}
+                          className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
+                        >
+                          <Plus className="h-5 w-5 mr-2" />
+                          Add Members
+                        </motion.button>
+                      )}
                     </div>
                   </div>
 
@@ -503,62 +625,79 @@ const OrganizationDashboard = () => {
                       <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                     </div>
                   ) : members?.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {members.map((member) => (
                         <motion.div
-                          key={member.user._id}
-                          whileHover={{ scale: 1.01 }}
-                          className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
+                          key={member.user?._id || member._id}
+                          whileHover={{ scale: 1.005 }}
+                          className="group relative flex items-center justify-between p-4 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/30 transition-all"
                         >
-                          <div className="flex items-center space-x-4">
-                            <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
-                              {member.user.name.charAt(0).toUpperCase()}
+                          <div className="flex items-center space-x-4 min-w-0">
+                            <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium shrink-0">
+                              {member.user?.name?.charAt(0)?.toUpperCase() || 'U'}
                             </div>
-                            <div>
-                              <h3 className="font-medium text-white">{member.user.name}</h3>
-                              <p className="text-sm text-gray-400">{member.user.email}</p>
+                            <div className="min-w-0">
+                            <h3 className="font-medium text-white">{member.user ? `${member.user.firstName} ${member.user.lastName}` : 'Unknown User'}</h3>
+                              <p className="text-sm text-gray-400 truncate">
+                                {member.user?.emailId || 'No email available'}
+                              </p>
                             </div>
                           </div>
                           
-                          <div className="flex items-center space-x-4">
-                            <div className="relative">
-                              <button
-                                onClick={() => setShowRoleDropdown(showRoleDropdown === member.user._id ? null : member.user._id)}
-                                className="flex items-center space-x-2 px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors"
-                              >
-                                <RoleBadge role={member.role} />
-                                <ChevronDown className="h-4 w-4 text-gray-400" />
-                              </button>
-                              
-                              {showRoleDropdown === member.user._id && (
-                                <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-lg z-10 border border-gray-700">
-                                  <div className="py-1">
-                                    {['admin', 'projectManager', 'employee'].map((role) => (
-                                      <button
-                                        key={role}
-                                        onClick={() => handleUpdateMemberRole(member.user._id, role)}
-                                        className={`block w-full text-left px-4 py-2 text-sm ${
-                                          member.role === role 
-                                            ? 'bg-blue-500/10 text-blue-400' 
-                                            : 'text-gray-300 hover:bg-gray-700'
-                                        }`}
-                                        disabled={member.role === role || (role === 'owner' && currentOrganization.owner?._id !== userId)}
-                                      >
-                                        {role.charAt(0).toUpperCase() + role.slice(1)}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
+                          <div className="flex items-center space-x-3">
+                            <RoleBadge role={member.role} />
                             
-                            {member.user._id !== userId && (
-                              <button
-                                onClick={() => handleRemoveMember(member.user._id)}
-                                className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                              >
-                                <X className="h-5 w-5" />
-                              </button>
+                            {isOwner && member.user?._id !== member.organization?.owner?._id && (
+                              <div className="flex space-x-2">
+                                {/* Update Role Button */}
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setShowRoleDropdown(showRoleDropdown === member.user?._id ? null : member.user?._id)}
+                                    className="flex items-center px-3 py-1.5 text-sm bg-gray-700/50 hover:bg-gray-700 border border-gray-600 rounded-lg transition-colors"
+                                  >
+                                    <Edit className="h-4 w-4 mr-1.5" />
+                                    Update Role
+                                  </button>
+                                  
+                                  {showRoleDropdown === member.user?._id && (
+                                    <div className="absolute right-0 mt-1 w-48 bg-gray-800 rounded-lg shadow-lg z-10 border border-gray-700">
+                                      <div className="py-1">
+                                        <div className="px-3 py-2 text-xs text-gray-400 border-b border-gray-700">
+                                          Select New Role
+                                        </div>
+                                        {['admin', 'projectManager', 'employee']
+                                          .filter(role => role !== member.role)
+                                          .map((role) => (
+                                            <button
+                                              key={role}
+                                              onClick={() => {
+                                                handleUpdateMemberRole(member.user?._id, role);
+                                                setShowRoleDropdown(null);
+                                              }}
+                                              className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700"
+                                            >
+                                              {role.charAt(0).toUpperCase() + role.slice(1)}
+                                            </button>
+                                          ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {/* Remove Button */}
+                                <button
+                                  onClick={() => {
+                                    console.log(member.user?._id, member.organization?.owner?._id);
+                                    if (window.confirm(`Are you sure you want to remove ${member.user?.name || 'this member'}?`)) {
+                                      handleRemoveMember(member.user?._id);
+                                    }
+                                  }}
+                                  className="flex items-center px-3 py-1.5 text-sm bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg transition-colors"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-1.5" />
+                                  Remove
+                                </button>
+                              </div>
                             )}
                           </div>
                         </motion.div>
@@ -569,14 +708,16 @@ const OrganizationDashboard = () => {
                       <Users className="mx-auto h-12 w-12 text-gray-500" />
                       <h3 className="mt-4 text-lg font-medium text-white">No Members Available</h3>
                       <p className="mt-1 text-gray-400">You haven't added any members to this organization yet</p>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleAddMembersClick}
-                        className="mt-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
-                      >
-                        Invite Members
-                      </motion.button>
+                      {isOwner && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={handleAddMembersClick}
+                          className="mt-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
+                        >
+                          Invite Members
+                        </motion.button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -588,7 +729,7 @@ const OrganizationDashboard = () => {
               <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">
                 <div className="p-8">
                   <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-2xl font-bold text-white">Invite Members</h2>
+                    <h2 className="text-2xl font-bold text-white">Invite New Members</h2>
                     <div className="flex space-x-3">
                       <motion.button
                         whileHover={{ scale: 1.02 }}
@@ -609,31 +750,7 @@ const OrganizationDashboard = () => {
                     </div>
                   </div>
 
-                  {inviteSuccess && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mb-4 p-4 bg-green-500/10 text-green-400 rounded-lg border border-green-500/20"
-                    >
-                      <div className="flex items-center">
-                        <Check className="h-5 w-5 mr-2" />
-                        <span>Invitation sent successfully!</span>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {inviteError && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mb-4 p-4 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20"
-                    >
-                      <div className="flex items-center">
-                        <X className="h-5 w-5 mr-2" />
-                        <span>{inviteError}</span>
-                      </div>
-                    </motion.div>
-                  )}
+                  <InviteStatusMessage />
 
                   {isInviting && (
                     <motion.div
@@ -665,7 +782,7 @@ const OrganizationDashboard = () => {
                             <option value="admin">Admin</option>
                             <option value="projectManager">Project Manager</option>
                             <option value="employee">Employee</option>
-                            {currentOrganization.owner?._id === userId && (
+                            {isOwner && (
                               <option value="owner">Owner</option>
                             )}
                           </select>
@@ -684,7 +801,7 @@ const OrganizationDashboard = () => {
                             type="submit"
                             className="px-6 py-3 text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors"
                           >
-                            Invite
+                            Send Invitation
                           </motion.button>
                         </div>
                       </form>
@@ -703,81 +820,83 @@ const OrganizationDashboard = () => {
             )}
 
             {/* Join Requests Tab */}
-{activeTab === 'requests' && (
-  <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-bold text-white">Pending Join Requests</h2>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => dispatch(fetchJoinRequestsForOrg(orgId))}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
-          >
-            <RefreshCw className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
-
-      {requestsLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        </div>
-      ) : joinRequests?.length > 0 ? (
-        <div className="space-y-4">
-          {joinRequests.map((request) => (
-            <motion.div
-              key={request._id}
-              whileHover={{ scale: 1.01 }}
-              className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
-                  {request.user?.firstName?.charAt(0).toUpperCase() || 'U'}
-                </div>
-                <div>
-                  <h3 className="font-medium text-white">
-                    {request.user?.firstName && request.user?.lastName
-                      ? `${request.user.firstName} ${request.user.lastName}`
-                      : 'Unknown User'}
-                  </h3>
-                  <p className="text-sm text-gray-400">
-                    {request.user?.emailId|| 'No email provided'}
-                  </p>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <RoleBadge role={request.role} />
-                    <span className="text-xs text-gray-500">
-                      Requested {new Date(request.createdAt).toLocaleDateString()}
-                    </span>
+            {activeTab === 'requests' && (
+              <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">
+                <div className="p-8">
+                  <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-2xl font-bold text-white">Join Requests</h2>
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => dispatch(fetchJoinRequestsForOrg(orgId))}
+                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+                        title="Refresh requests"
+                      >
+                        <RefreshCw className="h-5 w-5" />
+                      </button>
+                    </div>
                   </div>
+
+                  {requestsLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                    </div>
+                  ) : joinRequests?.length > 0 ? (
+                    <div className="space-y-3">
+                      {joinRequests.map((request) => (
+                        <motion.div
+                          key={request._id}
+                          whileHover={{ scale: 1.005 }}
+                          className="flex items-center justify-between p-4 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/30 transition-all"
+                        >
+                          <div className="flex items-center space-x-4 min-w-0">
+                            <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium shrink-0">
+                              {request.user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
+                            </div>
+                            <div className="min-w-0">
+                              <h3 className="font-medium text-white">
+                                {request.user?.firstName} {request.user?.lastName}
+                              </h3>
+                              <p className="text-sm text-gray-400 truncate">
+                                {request.user?.emailId || 'No email available'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="px-3 py-1 rounded-full text-xs font-medium border bg-gray-700/50 border-gray-600">
+                              {request.role.charAt(0).toUpperCase() + request.role.slice(1)}
+                            </div>
+                            {isOwner && (
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleRespondToJoinRequest(request._id, 'approve')}
+                                  className="flex items-center px-3 py-1.5 text-sm bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 rounded-lg transition-colors"
+                                >
+                                  <Check className="h-4 w-4 mr-1.5" />
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => handleRespondToJoinRequest(request._id, 'reject')}
+                                  className="flex items-center px-3 py-1.5 text-sm bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg transition-colors"
+                                >
+                                  <X className="h-4 w-4 mr-1.5" />
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Clock className="mx-auto h-12 w-12 text-gray-500" />
+                      <h3 className="mt-4 text-lg font-medium text-white">No Pending Requests</h3>
+                      <p className="mt-1 text-gray-400">There are no pending requests to join your organization</p>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleRespondToJoinRequest(request._id, 'approve')}
-                  className="flex items-center px-4 py-2 bg-green-500/10 text-green-400 border border-green-500/20 rounded-lg hover:bg-green-500/20 transition-colors"
-                >
-                  <Check className="h-4 w-4 mr-1" /> Approve
-                </button>
-                <button
-                  onClick={() => handleRespondToJoinRequest(request._id, 'reject')}
-                  className="flex items-center px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors"
-                >
-                  <X className="h-4 w-4 mr-1" /> Reject
-                </button>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <Clock className="mx-auto h-12 w-12 text-gray-500" />
-          <h3 className="mt-4 text-lg font-medium text-white">No Pending Requests</h3>
-          <p className="mt-1 text-gray-400">There are no pending requests to join your organization</p>
-        </div>
-      )}
-    </div>
-  </div>
-)}
+            )}
           </motion.div>
         </AnimatePresence>
       </main>

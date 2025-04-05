@@ -86,7 +86,7 @@ export const createInvitation = async (req, res) => {
       // Fetch invitations for the logged-in user's email
       const invitations = await Invitation.find({
         email: req.user.emailId, // Match the logged-in user's email
-        status: 'pending', // Only fetch pending invitations
+        
       });
   
       if (!invitations || invitations.length === 0) {
@@ -140,10 +140,34 @@ export const createInvitation = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invitation is no longer pending.' });
       }
   
-      invitation.status = accept ? 'accepted' : 'declined';
-      await invitation.save();
+      if (accept) {
+        // Add the user as a member of the organization
+        const membership = await Membership.create({
+          user: req.user._id, // The user accepting the invitation
+          organization: invitation.organization,
+          role: invitation.role, // Role from the invitation
+          approvedBy: invitation.invitedBy, // The inviter
+        });
   
-      res.status(200).json({ success: true, invitation });
+        // Update the invitation status to "accepted"
+        invitation.status = 'accepted';
+        await invitation.save();
+  
+        return res.status(200).json({
+          success: true,
+          message: 'Invitation accepted and user added as a member.',
+          membership,
+        });
+      } else {
+        // Update the invitation status to "rejected"
+        invitation.status = 'rejected';
+        await invitation.save();
+  
+        return res.status(200).json({
+          success: true,
+          message: 'Invitation rejected.',
+        });
+      }
     } catch (error) {
       console.error('Error responding to invitation:', error.message);
       res.status(500).json({ success: false, message: 'Failed to respond to invitation.' });

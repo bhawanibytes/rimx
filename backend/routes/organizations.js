@@ -1,6 +1,6 @@
 import express from 'express';
-import auth from '../middlewares/auth.js';
-import { createOrganization,  getOrganizationById,updateOrganization,getOrganizationMembers } from '../controllers/organizationcontroller.js';
+import auth, { authorizeOrganizationAccess } from '../middlewares/auth.js';
+import { createOrganization,  getOrganizationById,updateOrganization} from '../controllers/organizationcontroller.js';
 import Membership from '../models/Membership.js';
 import mongoose from 'mongoose';
 import Organization from '../models/Organization.js';
@@ -21,9 +21,8 @@ router.post('/', auth, createOrganization);
 // @access  Private
 router.get('/:id', getOrganizationById);
 router.put('/:id', auth, updateOrganization);
-router.get('/:id/members', auth, getOrganizationMembers);
-router.post('/:id/invitations', auth, createInvitation);
-router.get('/:userId/invitations', auth, fetchPendingInvitations);
+
+
 
 // @route   GET /v1/api/organizations/:id
 // @desc    Get organization details
@@ -89,10 +88,15 @@ router.get('/retrieve/allOrganizations', auth, async (req, res) => {
     const userId = req.user.id; // Authenticated user's ID
 
     // Fetch all organizations except those owned by the current user
-    const organizations = await Organization.find(
-      { owner: { $ne: userId } }, // Exclude organizations where the owner is the current user
-      'name description createdAt owner'
-    );
+    const organizations = await Organization.find({
+      $and: [
+        { _id: { $nin: [
+          ...(await Membership.find({ user: userId }).distinct('organization')), // Exclude organizations where the user is a member
+          ...(await JoinRequest.find({ user: userId }).distinct('organization')), // Exclude organizations where the user has sent a join request
+        ] } },
+        { owner: { $ne: userId } }, // Exclude organizations where the owner is the current user
+      ],
+    }).select('name description createdAt owner');
 
     res.status(200).json({
       success: true,
@@ -103,6 +107,66 @@ router.get('/retrieve/allOrganizations', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch organizations.',
+    });
+  }
+});
+
+// @route   GET /v1/org/organizations/myOrganizations
+// @desc    Get organizations where the user is the owner or a member
+// @access  Private
+router.get('/:id/myOrganizations', auth, async (req, res) => {
+  try {
+    console.log("Authenticated user object:", req.user);
+
+    const userId = req.user?.id;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      console.error("Invalid or undefined user ID:", userId);
+      return res.status(400).json({ success: false, message: 'Invalid user ID.' });
+    }
+
+    console.log("Fetching organizations for user ID:", userId);
+
+    // Fetch organizations where the user is the owner
+    const ownedOrganizations = await Organization.find({ owner: userId }).select(
+      'name description createdAt owner'
+    );
+
+    // Fetch organizations where the user is a member
+    const memberOrganizations = await Membership.find({ user: userId })
+      .populate('organization', 'name description createdAt owner') // Populate organization details
+      .select('organization role');
+
+    // Combine owned and member organizations
+    const organizations = [
+      ...ownedOrganizations.map((org) => ({
+        _id: org._id,
+        name: org.name,
+        description: org.description,
+        createdAt: org.createdAt,
+        owner: org.owner,
+        role: 'owner',
+      })),
+      ...memberOrganizations.map((membership) => ({
+        _id: membership.organization._id,
+        name: membership.organization.name,
+        description: membership.organization.description,
+        createdAt: membership.organization.createdAt,
+        owner: membership.organization.owner,
+        role: membership.role,
+      })),
+    ];
+
+    console.log("Fetched organizations:", organizations);
+
+    res.status(200).json({
+      success: true,
+      organizations,
+    });
+  } catch (err) {
+    console.error('Error fetching user organizations:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user organizations.',
     });
   }
 });
@@ -170,5 +234,21 @@ router.get('/retrieve/allOrganizations', auth, async (req, res) => {
 //     res.status(500).json({ success: false, message: 'Failed to fetch join requests.', error: error.message });
 //   }
 // });
+
+router.get('/:orgId/dashboard', auth, authorizeOrganizationAccess, async (req, res) => {
+  try {
+    const { orgId } = req.params;
+
+    const organization = await Organization.findById(orgId);
+    if (!organization) {
+      return res.status(404).json({ success: false, message: 'Organization not found.' });
+    }
+
+    res.status(200).json({ success: true, organization });
+  } catch (error) {
+    console.error('Error fetching organization dashboard:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch organization dashboard.' });
+  }
+});
 
 export default router;

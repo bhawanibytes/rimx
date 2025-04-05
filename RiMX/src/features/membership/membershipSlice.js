@@ -12,9 +12,8 @@ export const fetchMembers = createAsyncThunk(
   async (orgId, { rejectWithValue }) => {
     try {
       const response = await api.get(`/v1/org/organizations/${orgId}/members`);
-      return response.data;
+      return response.data.members;
     } catch (error) {
-      console.error("Error fetching members:", error.response?.data || error.message);
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch members.');
     }
   }
@@ -22,15 +21,15 @@ export const fetchMembers = createAsyncThunk(
 
 export const updateMemberRole = createAsyncThunk(
   'memberships/updateRole',
-  async ({ orgId, userId, newRole }, { rejectWithValue }) => {
+  async ({ orgId, memberId, newRole }, { rejectWithValue }) => {
     try {
       const response = await api.patch(
-        `/v1/org/organizations/${organizationId}/members/${userId}`,
+        `/v1/org/organizations/${orgId}/members/${memberId}`,
         { role: newRole }
       );
-      return response.data;
+      return response.data.member;
     } catch (error) {
-      console.error("Error updating member role:", error.response?.data || error.message);
+      console.error('Error updating member role:', error.response?.data || error.message);
       return rejectWithValue(error.response?.data?.message || 'Failed to update member role.');
     }
   }
@@ -38,12 +37,12 @@ export const updateMemberRole = createAsyncThunk(
 
 export const removeMember = createAsyncThunk(
   'memberships/remove',
-  async ({ orgId, userId }, { rejectWithValue }) => {
+  async ({ orgId, memberId }, { rejectWithValue }) => {
     try {
-      await api.delete(`/v1/org/organizations/${orgId}/members/${userId}`);
-      return userId;
+      await api.delete(`/v1/org/organizations/${orgId}/members/${memberId}`);
+      return memberId;
     } catch (error) {
-      console.error("Error removing member:", error.response?.data || error.message);
+      console.error('Error removing member:', error.response?.data || error.message);
       return rejectWithValue(error.response?.data?.message || 'Failed to remove member.');
     }
   }
@@ -69,7 +68,7 @@ const membershipSlice = createSlice({
       })
       .addCase(fetchMembers.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message;
+        state.error = action.payload;
       })
       .addCase(updateMemberRole.fulfilled, (state, action) => {
         const updatedMember = action.payload;

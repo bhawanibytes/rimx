@@ -53,5 +53,23 @@ const authorize = (...roles) => {
   };
 };
 
-export { auth, authorize };
+const authorizeOrganizationAccess = async (req, res, next) => {
+  try {
+    const { orgId } = req.params;
+    const userId = req.user._id;
+
+    const membership = await Membership.findOne({ organization: orgId, user: userId });
+    if (!membership) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+
+    req.membership = membership; // Attach membership details to the request
+    next();
+  } catch (error) {
+    console.error('Authorization error:', error.message);
+    res.status(500).json({ success: false, message: 'Server error.' });
+  }
+};
+
+export { auth, authorizeOrganizationAccess };
 export default auth;

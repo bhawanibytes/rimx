@@ -210,32 +210,32 @@ export const deleteOrganization = async (req, res) => {
   }
 };
 
-export const getOrganizationMembers = async (req, res) => {
-  try {
-    const { id } = req.params;
+// export const getOrganizationMembers = async (req, res) => {
+//   try {
+//     const { id } = req.params;
 
-    // Validate the organization ID
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid organization ID.',
-      });
-    }
+//     // Validate the organization ID
+//     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Invalid organization ID.',
+//       });
+//     }
 
-    // Fetch members from the Membership model
-    const members = await Membership.find({ organization: organizationId }).populate('user', 'name email');
+//     // Fetch members from the Membership model
+//     const members = await Membership.find({ organization: organizationId }).populate('user', 'name email');
 
-    return res.status(200).json({
-      success: true,
-      members,
-    });
-  } catch (error) {
-    console.error('Error fetching members:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch members.',
-      error: error.message,
-    });
-  }
-};
+//     return res.status(200).json({
+//       success: true,
+//       members,
+//     });
+//   } catch (error) {
+//     console.error('Error fetching members:', error.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Failed to fetch members.',
+//       error: error.message,
+//     });
+//   }
+// };
 

@@ -45,11 +45,13 @@ export const inviteUser = createAsyncThunk(
 
 export const respondToInvitation = createAsyncThunk(
   'invitations/respond',
-  async ({ invitationId, accept }) => {
-    const response = await api.patch(`/v1/invitations/${invitationId}/respond`, {
-      accept
-    });
-    return response.data;
+  async ({ invitationId, accept }, { rejectWithValue }) => {
+    try {
+      const response = await api.patch(`/v1/invitations/${invitationId}/respond`, { accept });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to respond to invitation.');
+    }
   }
 );
 
@@ -59,40 +61,31 @@ const invitationSlice = createSlice({
   reducers: {
     clearInvitationError: (state) => {
       state.error = null;
-    }
+    },
   },
   extraReducers: (builder) => {
     builder
-     // In your invitationSlice.js
-const initialState = {
-  pendingInvitations: [],
-  loading: false,
-  error: null
-};
-
-// Then in your reducers:
-builder
-  .addCase(fetchPendingInvitations.pending, (state) => {
-    state.loading = true;
-    state.error = null;
-  })
-  .addCase(fetchPendingInvitations.fulfilled, (state, action) => {
-    state.loading = false;
-    state.pendingInvitations = action.payload;
-  })
-  .addCase(fetchPendingInvitations.rejected, (state, action) => {
-    state.loading = false;
-    state.error = action.error.message;
-  })
+      .addCase(fetchPendingInvitations.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPendingInvitations.fulfilled, (state, action) => {
+        state.loading = false;
+        state.pendingInvitations = action.payload;
+      })
+      .addCase(fetchPendingInvitations.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
       .addCase(inviteUser.fulfilled, (state, action) => {
         state.pendingInvitations.push(action.payload.invitation);
       })
       .addCase(respondToInvitation.fulfilled, (state, action) => {
         state.pendingInvitations = state.pendingInvitations.filter(
-          invite => invite._id !== action.payload._id
+          (invite) => invite._id !== action.payload.invitation._id
         );
       });
-  }
+  },
 });
 
 export const { clearInvitationError } = invitationSlice.actions;

@@ -29,16 +29,18 @@ const Navbar = () => {
   };
 
   const handleLogout = () => {
-    dispatch(logout());
-    setAccountDropdownOpen(false);
-    setMobileMenuOpen(false);
-    navigate('/');
+    dispatch(logout()); // Clear Redux auth state
+    localStorage.clear(); // Clear all localStorage data
+    navigate('/login'); // Redirect to login page
   };
 
   const handleSwitchAccount = (accountId) => {
-    dispatch(switchAccount(accountId));
-    setAccountDropdownOpen(false);
-    setMobileMenuOpen(false);
+    dispatch(switchAccount(accountId)); // Switch account in Redux state
+    const account = accounts.find((acc) => acc.user.id === accountId);
+    if (account) {
+      localStorage.setItem('authToken', account.token); // Update token in localStorage
+      localStorage.setItem('userId', account.user.id); // Update userId in localStorage
+    }
   };
 
   const handleAddAccount = () => {

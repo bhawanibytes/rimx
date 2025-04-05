@@ -6,6 +6,8 @@ import authRouter from '../routes/auth.js'; // Assuming this exists
 import organizationRouter from '../routes/organizations.js'; // Import the updated organization router
 import auth from '../middlewares/auth.js'; // Import the auth middleware
 import joinRequests from '../routes/joinRequests.js';
+import inviteRouter from '../routes/invitations.js'; // Import the invitation router
+import membersRouter from '../routes/membersRoutes.js'; // Import the members routes
 
 const app = express();
 
@@ -34,8 +36,12 @@ app.use('/v1/auth', authRouter);
 
 // Organization routes (without auth middleware)
 app.use('/v1/org/organizations',auth, organizationRouter);
-app.use('/v1/org/user',auth, organizationRouter);
+app.use('/v1/org/organizations', auth, inviteRouter);
+app.use('/v1/invitations',auth,inviteRouter);
+app.use('/v1/org/user',auth, inviteRouter);
+
 app.use('/v1/org/organizations',auth, joinRequests);
+app.use('/v1/org/organizations',auth, membersRouter); // Add members routes
 
 // Error handling middleware (should be last)
 app.use((err, req, res, next) => {
