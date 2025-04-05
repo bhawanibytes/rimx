@@ -57,11 +57,25 @@ const WelcomePage = () => {
     if (activeTab === "organizations") {
       dispatch(fetchUserOrganizations());
     } else if (activeTab === "invitations") {
-      dispatch(fetchPendingInvitations());
+      if (orgId) {
+        dispatch(fetchPendingInvitations(orgId)); // Pass orgId here
+      } else {
+        console.error("Organization ID is not set in localStorage.");
+      }
     } else if (activeTab === "join") {
       dispatch(fetchAllOrganizations());
     }
-  }, [activeTab, dispatch, userOrganizations]);
+  }, [activeTab, dispatch, orgId]);
+
+  useEffect(() => {
+    if (activeTab === 'invitations') {
+      if (user && user.id) {
+        dispatch(fetchPendingInvitations(user.id)); // Pass userId here
+      } else {
+        console.error('User ID is not available.');
+      }
+    }
+  }, [activeTab, dispatch, user]);
 
   // Clear organization error when unmounting
   useEffect(() => {
@@ -365,76 +379,82 @@ useEffect(() => {
             )}
 
             {/* Invitations Tab */}
-            {activeTab === "invitations" && (
-              <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">
-                <div className="p-8">
-                  <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-2xl font-bold text-white">Pending Invitations</h2>
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={() => dispatch(fetchPendingInvitations())}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
-                      >
-                        <RefreshCw className="h-5 w-5" />
-                      </button>
-                    </div>
+{/* Invitations Tab */}
+{activeTab === "invitations" && (
+  <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-2xl font-bold text-white">Pending Invitations</h2>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => user?.id && dispatch(fetchPendingInvitations(user.id))}
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+          >
+            <RefreshCw className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      {invitesLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        </div>
+      ) : pendingInvitations?.length > 0 ? (
+        <div className="space-y-4">
+          {pendingInvitations.map((invite) => {
+            // Safely access nested properties
+            const orgName = invite.organizationName|| 'Unknown Organization';
+            const inviterName = invite.inviterName || 'Unknown User';
+            
+            return (
+              <motion.div
+                key={invite._id}
+                whileHover={{ scale: 1.01 }}
+                className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
+                    {orgName.charAt(0).toUpperCase()}
                   </div>
-
-                  {invitesLoading ? (
-                    <div className="flex justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                    </div>
-                  ) : pendingInvitations?.length > 0 ? (
-                    <div className="space-y-4">
-                      {pendingInvitations.map((invite) => (
-                        <motion.div
-                          key={invite.id}
-                          whileHover={{ scale: 1.01 }}
-                          className="flex items-center justify-between p-5 bg-gray-700/30 border border-gray-600 rounded-lg hover:border-blue-500/50 transition-all"
-                        >
-                          <div className="flex items-center space-x-4">
-                            <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 text-lg font-medium">
-                              {invite.organization.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <h3 className="font-medium text-white">{invite.organization.name}</h3>
-                              <p className="text-sm text-gray-400">
-                                Invited as: <RoleBadge role={invite.role} />
-                              </p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                From: {invite.inviter.name}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleRespondToInvite(invite.id, true)}
-                              className="flex items-center px-4 py-2 bg-green-600/10 text-green-400 border border-green-600/20 rounded-lg hover:bg-green-600/20 transition-colors"
-                            >
-                              <Check className="h-4 w-4 mr-1" /> Accept
-                            </button>
-                            <button
-                              onClick={() => handleRespondToInvite(invite.id, false)}
-                              className="flex items-center px-4 py-2 bg-red-600/10 text-red-400 border border-red-600/20 rounded-lg hover:bg-red-600/20 transition-colors"
-                            >
-                              <X className="h-4 w-4 mr-1" /> Reject
-                            </button>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Mail className="mx-auto h-12 w-12 text-gray-500" />
-                      <h3 className="mt-4 text-lg font-medium text-white">No Pending Invitations</h3>
-                      <p className="mt-1 text-gray-400">You don't have any organization invitations</p>
-                    </div>
-                  )}
+                  <div>
+                    <h3 className="font-medium text-white">{orgName}</h3>
+                    <p className="text-sm text-gray-400">
+                      Invited as: <RoleBadge role={invite.role} />
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      From: {inviterName}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
-
+                
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleRespondToInvite(invite._id, true)}
+                    className="flex items-center px-4 py-2 bg-green-600/10 text-green-400 border border-green-600/20 rounded-lg hover:bg-green-600/20 transition-colors"
+                  >
+                    <Check className="h-4 w-4 mr-1" /> Accept
+                  </button>
+                  <button
+                    onClick={() => handleRespondToInvite(invite._id, false)}
+                    className="flex items-center px-4 py-2 bg-red-600/10 text-red-400 border border-red-600/20 rounded-lg hover:bg-red-600/20 transition-colors"
+                  >
+                    <X className="h-4 w-4 mr-1" /> Reject
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <Mail className="mx-auto h-12 w-12 text-gray-500" />
+          <h3 className="mt-4 text-lg font-medium text-white">No Pending Invitations</h3>
+          <p className="mt-1 text-gray-400">You don't have any organization invitations</p>
+        </div>
+      )}
+    </div>
+  </div>
+)}
             {/* Join Organizations Tab */}
             {activeTab === "join" && (
               <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">

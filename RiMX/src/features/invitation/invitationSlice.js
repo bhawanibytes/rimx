@@ -6,12 +6,18 @@ const initialState = {
   loading: false,
   error: null
 };
-const user = localStorage.getItem('userId'); // Assuming you have a way to get the user ID
+const userId = localStorage.getItem('userId'); // Assuming you have a way to get the user ID
 export const fetchPendingInvitations = createAsyncThunk(
   'invitations/fetchPending',
-  async (organizationId) => {
-    const response = await api.get(`/v1/org/organization/${organizationId}/invitations?status=pending`);
-    return response.data;
+  async (userId, { rejectWithValue }) => {
+    try {
+      console.log('Fetching invitations for userId:', userId); // Debugging log
+      const response = await api.get(`/v1/org/user/${userId}/invitations`);
+      return response.data.invitations; // Return only the invitations array
+    } catch (error) {
+      console.error('Error fetching pending invitations:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch invitations.');
+    }
   }
 );
 
@@ -20,12 +26,13 @@ export const inviteUser = createAsyncThunk(
   async ({ orgId, email, role }, { rejectWithValue }) => {
     try {
       const token = Math.random().toString(36).substring(2, 15); // Example token generation
-      const expiresAt = Math.random() * 1000 * 60 * 60 * 24 * 7; // 1 week in milliseconds
+      const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
       console.log('Payload being sent:', { orgId, email, role }); // Debugging log
       const response = await api.post(`/v1/org/organizations/${orgId}/invitations`, {
        orgId,
         email,
-        role,token,invitedBy:user,
+        role,token,invitedBy:userId,
         expiresAt
       });
       return response.data;
@@ -56,14 +63,27 @@ const invitationSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchPendingInvitations.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchPendingInvitations.fulfilled, (state, action) => {
-        state.loading = false;
-        state.pendingInvitations = action.payload;
-      })
+     // In your invitationSlice.js
+const initialState = {
+  pendingInvitations: [],
+  loading: false,
+  error: null
+};
+
+// Then in your reducers:
+builder
+  .addCase(fetchPendingInvitations.pending, (state) => {
+    state.loading = true;
+    state.error = null;
+  })
+  .addCase(fetchPendingInvitations.fulfilled, (state, action) => {
+    state.loading = false;
+    state.pendingInvitations = action.payload;
+  })
+  .addCase(fetchPendingInvitations.rejected, (state, action) => {
+    state.loading = false;
+    state.error = action.error.message;
+  })
       .addCase(inviteUser.fulfilled, (state, action) => {
         state.pendingInvitations.push(action.payload.invitation);
       })

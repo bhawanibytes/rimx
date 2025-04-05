@@ -64,7 +64,7 @@ joinRequests.get('/:id/join-requests', auth, async (req, res) => {
 
     // Fetch join requests for the organization
     const joinRequests = await JoinRequest.find({ organization: id })
-      .populate('user', 'firstName lastName email') // Populate user details
+      .populate('user', 'firstName lastName emailId') // Populate user details
       .sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, joinRequests });

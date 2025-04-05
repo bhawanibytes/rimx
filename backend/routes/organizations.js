@@ -4,7 +4,7 @@ import { createOrganization,  getOrganizationById,updateOrganization,getOrganiza
 import Membership from '../models/Membership.js';
 import mongoose from 'mongoose';
 import Organization from '../models/Organization.js';
-import { createInvitation } from '../controllers/invitationController.js'; // Adjust the import path as necessary
+import { createInvitation,fetchPendingInvitations } from '../controllers/invitationController.js'; // Adjust the import path as necessary
 import Invitation from '../models/Invitation.js';
 // import { generateToken } from '../utils/tokenLogic.js';
 import  generateToken from '../utils/tokenLogic.js'; // Adjust the import path as necessary
@@ -23,6 +23,8 @@ router.get('/:id', getOrganizationById);
 router.put('/:id', auth, updateOrganization);
 router.get('/:id/members', auth, getOrganizationMembers);
 router.post('/:id/invitations', auth, createInvitation);
+router.get('/:userId/invitations', auth, fetchPendingInvitations);
+
 // @route   GET /v1/api/organizations/:id
 // @desc    Get organization details
 // @access  Private (must be member)

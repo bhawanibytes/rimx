@@ -34,6 +34,7 @@ app.use('/v1/auth', authRouter);
 
 // Organization routes (without auth middleware)
 app.use('/v1/org/organizations',auth, organizationRouter);
+app.use('/v1/org/user',auth, organizationRouter);
 app.use('/v1/org/organizations',auth, joinRequests);
 
 // Error handling middleware (should be last)

@@ -741,7 +741,7 @@ const OrganizationDashboard = () => {
                       : 'Unknown User'}
                   </h3>
                   <p className="text-sm text-gray-400">
-                    {request.user?.emailId || 'No email provided'}
+                    {request.user?.emailId|| 'No email provided'}
                   </p>
                   <div className="flex items-center space-x-2 mt-1">
                     <RoleBadge role={request.role} />

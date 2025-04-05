@@ -174,17 +174,18 @@ export const createInvitation = async (orgId, email, role) => {
   }
 };
 
-export const fetchPendingInvitations = async (orgId) => {
-  try {
-    const response = await api.get(`/v1/org/organizations/${orgId}/invitations?status=pending`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching pending invitations:', error.response?.data || error.message);
-    throw new Error(
-      error.response?.data?.message || 'Failed to fetch pending invitations. Please try again.'
-    );
-  }
-};
+// const user = localStorage.getItem('userId'); // Assuming you have a way to get the user ID
+export const fetchPendingInvitations = 
+  async (userId, { rejectWithValue }) => {
+    try {
+      console.log('Fetching invitations for userId:', userId); // Debugging log
+      const response = await api.get(`/v1/org/user/${userId}/invitations`);
+      return response.data.invitations; // Return only the invitations array
+    } catch (error) {
+      console.error('Error fetching pending invitations:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch invitations.');
+    }
+  };
 
 export const respondToInvitation = async (invitationId, accept) => {
   try {

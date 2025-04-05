@@ -19,12 +19,12 @@ export const respondToJoinRequest = createAsyncThunk(
   'joinRequests/respondToJoinRequest',
   async ({ orgId, requestId, response }, { rejectWithValue }) => {
     try {
-      await api.post(`/v1/org/organizations/${orgId}/join-requests/${requestId}/respond`, {
+      const res = await api.post(`/v1/org/organizations/${orgId}/join-requests/${requestId}/respond`, {
         action: response,
       });
-      return { requestId, response };
+      return { requestId, response, message: res.data.message };
     } catch (err) {
-      return rejectWithValue(err.response?.data || 'Failed to respond to join request.');
+      return rejectWithValue(err.response?.data?.message || 'Failed to respond to join request.');
     }
   }
 );
