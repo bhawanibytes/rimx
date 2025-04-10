@@ -47,6 +47,7 @@ app.use('/v1/org/organizations',auth, membersRouter); // Add members routes
 // Department routes
 app.use('/v1/org/organizations', auth, departmentRouter);
 app.use('/v1/org/departments', departmentRouter);
+
 // Error handling middleware (should be last)
 app.use((err, req, res, next) => {
   console.error(err.stack);

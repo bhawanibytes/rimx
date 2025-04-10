@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { User, Mail, Lock, Eye, EyeOff, Check } from "lucide-react";
-import { signupUser, sendEmailOTP, verifyEmailOTP } from "../services/api";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { app } from "../firebase"; // Your Firebase config file
+import { User, Mail, Phone, Lock, Eye, EyeOff, Check } from "lucide-react";
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { auth } from "../firebase"; // Import Firebase auth
 
 const SignupForm = () => {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
+    phone: "",
     password: "",
     confirmPassword: "",
     acceptTerms: false
@@ -21,16 +21,7 @@ const SignupForm = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-
-  const [otpModalOpen, setOtpModalOpen] = useState(false);
-  const [otp, setOtp] = useState("");
-  const [otpError, setOtpError] = useState("");
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [emailVerified, setEmailVerified] = useState(false);
-
   const navigate = useNavigate();
-  const auth = getAuth(app);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -51,67 +42,8 @@ const SignupForm = () => {
     return strength;
   };
 
-  const handleGoogleSignUp = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-
-      await signupUser({
-        firstName: result.user.displayName?.split(' ')[0] || '',
-        lastName: result.user.displayName?.split(' ')[1] || '',
-        emailId: result.user.email,
-        password: '' // Not needed for Google auth
-      });
-
-      navigate('/WelcomePage');
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
-  const handleSendOTP = async () => {
-    if (!formData.email) {
-      setError("Please enter a valid email address");
-      return;
-    }
-
-    setIsSendingOtp(true);
-    try {
-      await sendEmailOTP({ email: formData.email });
-      setOtpModalOpen(true);
-      setOtpError("");
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to send OTP");
-    } finally {
-      setIsSendingOtp(false);
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    if (otp.length !== 6) {
-      setOtpError("OTP must be 6 digits");
-      return;
-    }
-
-    setIsVerifyingOtp(true);
-    try {
-      await verifyEmailOTP({ email: formData.email, otp });
-      setEmailVerified(true);
-      setOtpModalOpen(false);
-    } catch (err) {
-      setOtpError(err.response?.data?.message || "Invalid OTP. Please try again.");
-    } finally {
-      setIsVerifyingOtp(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!emailVerified) {
-      setError("Please verify your email first");
-      return;
-    }
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords don't match");
@@ -128,70 +60,54 @@ const SignupForm = () => {
     setSuccess(false);
 
     try {
-      const userData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        emailId: formData.email,
-        password: formData.password
-      };
+      // Create user with Firebase
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
 
-      const response = await signupUser(userData);
+      // Update user profile
+      await updateProfile(userCredential.user, {
+        displayName: `${formData.firstName} ${formData.lastName}`,
+      });
+
+      console.log("Signup successful:", userCredential.user);
+
       setSuccess(true);
-      setSuccessMessage(response.data?.message || "Account created successfully! Redirecting to login...");
+      setSuccessMessage("Account created successfully! Redirecting to login...");
 
+      // Redirect after 3 seconds
       setTimeout(() => {
-        navigate('/login');
+        navigate("/login");
       }, 3000);
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed. Please try again.");
+      console.error("Signup error:", err);
+      setError(err.message || "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      console.log("Google Sign-In successful:", user);
+
+      // Redirect to WelcomePage or another page
+      navigate("/WelcomePage");
+    } catch (error) {
+      console.error("Google Sign-In error:", error);
+      setError(error.message || "Google Sign-In failed. Please try again.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 flex items-center justify-center p-4">
-      {/* OTP Modal */}
-      {otpModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-xl p-6 max-w-sm w-full border border-purple-500 animate-fade-in">
-            <div className="flex flex-col items-center text-center">
-              <h3 className="text-xl font-bold text-white mb-2">Verify Your Email</h3>
-              <p className="text-gray-300 mb-4">Enter the 6-digit OTP sent to {formData.email}</p>
-              <input
-                type="text"
-                value={otp}
-                onChange={(e) => {
-                  if (e.target.value.length <= 6 && /^\d*$/.test(e.target.value)) {
-                    setOtp(e.target.value);
-                    setOtpError("");
-                  }
-                }}
-                className="w-full px-4 py-3 bg-gray-700/50 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all text-white text-center text-xl tracking-widest"
-                placeholder="------"
-                maxLength={6}
-              />
-              {otpError && <p className="text-red-400 text-sm mt-2">{otpError}</p>}
-              <button
-                onClick={handleVerifyOTP}
-                disabled={isVerifyingOtp || otp.length !== 6}
-                className="w-full mt-6 bg-gradient-to-r from-cyan-600 to-purple-600 py-3 px-4 rounded-lg font-medium transition-all duration-300 disabled:opacity-70"
-              >
-                {isVerifyingOtp ? "Verifying..." : "Verify OTP"}
-              </button>
-              <button
-                onClick={handleSendOTP}
-                disabled={isSendingOtp}
-                className="mt-4 text-cyan-400 hover:text-cyan-300 text-sm disabled:opacity-70"
-              >
-                {isSendingOtp ? "Sending..." : "Resend OTP"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Success Modal */}
       {success && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-xl p-6 max-w-sm w-full border border-green-500 animate-fade-in">
@@ -202,8 +118,8 @@ const SignupForm = () => {
               <h3 className="text-xl font-bold text-white mb-2">Success!</h3>
               <p className="text-gray-300 mb-6">{successMessage}</p>
               <div className="w-full bg-gray-700 rounded-full h-1.5">
-                <div
-                  className="bg-green-500 h-1.5 rounded-full animate-progress"
+                <div 
+                  className="bg-green-500 h-1.5 rounded-full animate-progress" 
                   style={{ animationDuration: '3s' }}
                 ></div>
               </div>
@@ -213,7 +129,6 @@ const SignupForm = () => {
       )}
 
       <div className="w-full max-w-6xl flex bg-gray-800/50 rounded-2xl shadow-2xl backdrop-blur-xl border border-purple-500/30 overflow-hidden relative">
-        {/* Left Side */}
         <div className="absolute inset-0 z-0">
           <div className="absolute -top-20 -left-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
           <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
@@ -276,9 +191,9 @@ const SignupForm = () => {
             <p className="text-gray-300">Join the future of team collaboration</p>
           </div>
 
-          {/* Google Sign-In Button */}
           <button
-            onClick={handleGoogleSignUp}
+            type="button"
+            onClick={handleGoogleSignIn}
             className="w-full flex items-center justify-center gap-3 mb-6 py-3 px-4 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg transition-all duration-300"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -288,14 +203,6 @@ const SignupForm = () => {
               />
             </svg>
             <span className="text-white font-medium">Continue with Google</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSendOTP}
-            className="w-full flex items-center justify-center gap-3 mb-6 py-3 px-4 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg transition-all duration-300"
-          >
-            <span className="text-white font-medium">Send OTP</span>
           </button>
 
           <div className="flex items-center my-6">
@@ -358,6 +265,26 @@ const SignupForm = () => {
                   onChange={handleChange}
                   className="w-full pl-10 pr-3 py-3 bg-gray-700/50 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all text-white backdrop-blur-sm"
                   placeholder="you@company.com"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Phone Number</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Phone className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-3 py-3 bg-gray-700/50 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all text-white backdrop-blur-sm"
+                  placeholder="9876543210"
+                  minLength={10}
                   required
                   disabled={isLoading}
                 />
