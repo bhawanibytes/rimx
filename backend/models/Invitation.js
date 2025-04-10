@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const invitationSchema = new mongoose.Schema({
   email: {
     type: String,
-    required: [true, 'Email is required'],
+    required: true,
     trim: true,
     lowercase: true,
     match: [/\S+@\S+\.\S+/, 'Please enter a valid email address']
@@ -11,12 +11,12 @@ const invitationSchema = new mongoose.Schema({
   organization: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization',
-    required: [true, 'Organization reference is required']
+    required: true
   },
   role: {
     type: String,
-    enum: ['admin', 'projectManager', 'employee'],
-    required: [true, 'Role is required']
+    enum: ['manager', 'hr', 'projectManager', 'teamLead', 'employee'],
+    required: true
   },
   token: {
     type: String,
@@ -30,13 +30,18 @@ const invitationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected', 'expired'],
+    enum: ['pending', 'accepted', 'rejected'],
     default: 'pending'
   },
   expiresAt: {
     type: Date,
     required: true,
     default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+  },
+  department: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department', // Assuming a Department model exists
+    required: false, // Make it optional if not all invitations require a department
   }
 }, {
   timestamps: true

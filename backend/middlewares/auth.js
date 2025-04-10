@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
+import Organization from '../models/Organization.js';
 
 // Error response helper
 const errorResponse = (res, statusCode, message) => {
@@ -64,6 +65,28 @@ const authorizeOrganizationAccess = async (req, res, next) => {
     }
 
     req.membership = membership; // Attach membership details to the request
+    next();
+  } catch (error) {
+    console.error('Authorization error:', error.message);
+    res.status(500).json({ success: false, message: 'Server error.' });
+  }
+};
+
+export const authorizeOwner = async (req, res, next) => {
+  try {
+    const { orgId } = req.body; // or req.params
+    const userId = req.user._id;
+
+    // Check if the user is the owner of the organization
+    const organization = await Organization.findById(orgId);
+    if (!organization) {
+      return res.status(404).json({ success: false, message: 'Organization not found.' });
+    }
+
+    if (organization.owner.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied. Only owners can perform this action.' });
+    }
+
     next();
   } catch (error) {
     console.error('Authorization error:', error.message);

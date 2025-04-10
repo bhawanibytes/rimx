@@ -32,10 +32,11 @@ export const respondToJoinRequest = createAsyncThunk(
 // Send a join request
 export const sendJoinRequest = createAsyncThunk(
   'joinRequests/sendJoinRequest',
-  async ({ organizationId, role }, { rejectWithValue }) => {
+  async ({ organizationId, role, department }, { rejectWithValue }) => {
     try {
       const response = await api.post(`/v1/org/organizations/${organizationId}/join-requests`, {
         role,
+        department, // Include department in the payload
       });
       return response.data;
     } catch (err) {

@@ -1,5 +1,5 @@
 import axios from 'axios';
-
+import { ROLES } from '../constants/roles'; // Adjust the import path as necessary
 const api = axios.create({
   baseURL: import.meta.env.VITE_BACKEND_URL,
   timeout: 10000,
@@ -201,6 +201,13 @@ export const respondToInvitation = async (invitationId, accept) => {
   }
 };
 
+export const inviteUser = async (orgId, email, role) => {
+  if (!ROLES.includes(role)) {
+    throw new Error('Invalid role specified.');
+  }
+  return api.post(`/v1/org/organizations/${orgId}/invitations`, { email, role });
+};
+
 // Members API
 export const updateMemberRole = async (orgId, userId, newRole) => {
   try {
@@ -216,5 +223,17 @@ export const updateMemberRole = async (orgId, userId, newRole) => {
     );
   }
 };
+
+export const fetchDepartments = (orgId) =>
+  api.get(`/v1/org/organizations/${orgId}/departments`);
+
+export const createDepartment = (orgId, name) =>
+  api.post(`/v1/org/organizations/${orgId}/departments`, { name });
+
+export const assignMemberToDepartment = (orgId, deptId, memberId) =>
+  api.post(`/v1/org/organizations/${orgId}/departments/${deptId}/members`, { memberId });
+
+export const deleteDepartment = (deptId) =>
+  api.delete(`/v1/org/departments/${deptId}`);
 
 export default api;

@@ -4,20 +4,25 @@ const membershipSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'User reference is required']
+    required: true,
   },
   organization: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization',
-    required: [true, 'Organization reference is required']
+    required: true,
   },
   role: {
     type: String,
-    enum: {
-      values: ['admin', 'projectManager', 'employee', 'teamLead', 'member'],
-      message: 'Invalid role specified'
-    },
-    default: 'employee'
+    enum: ['owner', 'admin', 'manager', 'hr', 'projectManager', 'teamLead', 'employee', 'member'],
+    required: true,
+  },
+  department: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department',
+  },
+  permissions: {
+    type: [String], // List of permissions
+    default: [],
   },
   joinedAt: {
     type: Date,

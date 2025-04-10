@@ -4,26 +4,20 @@ import User from '../models/userModel.js';
 
 // Fetch all members of an organization
 export const fetchMembers = async (req, res) => {
- console.log('Request Params:', req.params); // Debugging log 
   try {
-   
     const { orgId } = req.params;
-    console.log('Organization ID:', orgId);
 
     if (!orgId || !mongoose.Types.ObjectId.isValid(orgId)) {
-      console.error('Invalid organization ID:', orgId);
       return res.status(400).json({ success: false, message: 'Invalid organization ID.' });
     }
 
     const members = await Membership.find({ organization: orgId })
       .populate('user', 'firstName lastName emailId')
-      .select('user role joinedAt');
-
-    console.log('Fetched members:', members);
+      .populate('department', 'name') // Populate department details
+      .select('user role department joinedAt');
 
     res.status(200).json({ success: true, members });
   } catch (error) {
-    console.error('Error fetching members:', error.message);
     res.status(500).json({ success: false, message: 'Failed to fetch members.' });
   }
 };
@@ -42,7 +36,7 @@ export const updateMemberRole = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid member ID.' });
     }
 
-    if (!['admin', 'projectManager', 'employee', 'teamLead', 'member'].includes(role)) {
+    if (!['owner', 'admin', 'manager', 'hr', 'projectManager', 'teamLead', 'employee', 'member'].includes(role)) {
       return res.status(400).json({ success: false, message: 'Invalid role specified.' });
     }
 

@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./firebase";
 import RiMXLandingPage from './pages/RiMXLandingPage'
 import Signup from './pages/Signup'
 import Terms from './components/Terms'
@@ -13,21 +15,24 @@ import Pricing from './components/Pricing'
 import Teams from './components/Teams'
 import Welcomepage from './pages/WelcomePage'
 import OrganizationDashboard from './pages/OrganizationDashboard'   
+// import UserProfile from './components/UserProfile'
 
-const PrivateRoute = ({ children, roles }) => {
-  const { user, isAuthenticated } = useSelector((state) => state.auth);
+const PrivateRoute = ({ children }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Redirect to login if the user is not authenticated
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsAuthenticated(!!user);
+      setLoading(false);
+    });
 
-  // If roles are specified, check if the user's role is allowed
-  if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/WelcomePage" />;
-  }
+    return () => unsubscribe();
+  }, []);
 
-  return children;
+  if (loading) return <div>Loading...</div>;
+
+  return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
 const App = () => {
@@ -41,6 +46,7 @@ const App = () => {
           <Route path='/signup' element={<Signup/>}/>
           <Route path='/login' element={<LoginForm/>}/>
           <Route path='/ContactPage' element={<ContactPage/>}/>
+          {/* <Route path ='/UserProfile' element={<PrivateRoute><UserProfile/></PrivateRoute>}/> */}
           <Route 
             path='/WelcomePage' 
             element={

@@ -4,6 +4,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Zap, Search, Home, Layers, CreditCard, Users, Mail, User, ChevronDown, LogOut, PlusCircle, Settings } from 'lucide-react';
 import { logout, switchAccount } from '../features/slices/authSlice';
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
 
 const Navbar = () => {
   const location = useLocation();
@@ -28,10 +30,14 @@ const Navbar = () => {
     console.log("Searching for:", searchQuery);
   };
 
-  const handleLogout = () => {
-    dispatch(logout()); // Clear Redux auth state
-    localStorage.clear(); // Clear all localStorage data
-    navigate('/login'); // Redirect to login page
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      console.log("User logged out");
+      navigate("/login");
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
   };
 
   const handleSwitchAccount = (accountId) => {
@@ -144,7 +150,7 @@ const Navbar = () => {
                         </div>
                         
                         <Link
-                          to="/account"
+                          to="/UserProfile"
                           className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50"
                           onClick={() => setAccountDropdownOpen(false)}
                         >

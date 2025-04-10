@@ -8,6 +8,7 @@ import auth from '../middlewares/auth.js'; // Import the auth middleware
 import joinRequests from '../routes/joinRequests.js';
 import inviteRouter from '../routes/invitations.js'; // Import the invitation router
 import membersRouter from '../routes/membersRoutes.js'; // Import the members routes
+import departmentRouter from '../routes/departmentRoutes.js'; // Import the department routes
 
 const app = express();
 
@@ -43,6 +44,9 @@ app.use('/v1/org/user',auth, inviteRouter);
 app.use('/v1/org/organizations',auth, joinRequests);
 app.use('/v1/org/organizations',auth, membersRouter); // Add members routes
 
+// Department routes
+app.use('/v1/org/organizations', auth, departmentRouter);
+app.use('/v1/org/departments', departmentRouter);
 // Error handling middleware (should be last)
 app.use((err, req, res, next) => {
   console.error(err.stack);

@@ -3,10 +3,15 @@ import api from '../../services/api';
 
 const initialState = {
   roles: [
+    { id: 'owner', name: 'Owner' },
     { id: 'admin', name: 'Admin' },
+    { id: 'manager', name: 'Manager' },
+    { id: 'hr', name: 'HR' },
     { id: 'projectManager', name: 'Project Manager' },
+    { id: 'teamLead', name: 'Team Lead' },
+    { id: 'employee', name: 'Employee' },
     { id: 'member', name: 'Member' }
-  ], // Static roles based on your API
+  ],
   loading: false,
   error: null
 };

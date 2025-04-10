@@ -11,11 +11,9 @@ export const fetchPendingInvitations = createAsyncThunk(
   'invitations/fetchPending',
   async (userId, { rejectWithValue }) => {
     try {
-      console.log('Fetching invitations for userId:', userId); // Debugging log
       const response = await api.get(`/v1/org/user/${userId}/invitations`);
       return response.data.invitations; // Return only the invitations array
     } catch (error) {
-      console.error('Error fetching pending invitations:', error.response?.data || error.message);
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch invitations.');
     }
   }
@@ -23,17 +21,20 @@ export const fetchPendingInvitations = createAsyncThunk(
 
 export const inviteUser = createAsyncThunk(
   'invitations/create',
-  async ({ orgId, email, role }, { rejectWithValue }) => {
+  async ({ orgId, email, role, department }, { rejectWithValue }) => {
     try {
       const token = Math.random().toString(36).substring(2, 15); // Example token generation
       const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 7);
-      console.log('Payload being sent:', { orgId, email, role }); // Debugging log
+      expiresAt.setDate(expiresAt.getDate() + 7);
+      console.log('Payload being sent:', { orgId, email, role, department }); // Debugging log
       const response = await api.post(`/v1/org/organizations/${orgId}/invitations`, {
-       orgId,
+        orgId,
         email,
-        role,token,invitedBy:userId,
-        expiresAt
+        role,
+        department, // Include department in the payload
+        token,
+        invitedBy: userId,
+        expiresAt,
       });
       return response.data;
     } catch (error) {
