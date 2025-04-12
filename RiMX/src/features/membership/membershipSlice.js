@@ -8,13 +8,13 @@ const initialState = {
 };
 
 export const fetchMembers = createAsyncThunk(
-  'memberships/fetchAll',
+  "members/fetchMembers",
   async (orgId, { rejectWithValue }) => {
     try {
       const response = await api.get(`/v1/org/organizations/${orgId}/members`);
       return response.data.members;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch members.');
+      return rejectWithValue(error.response?.data?.message || "Failed to fetch members.");
     }
   }
 );
@@ -48,14 +48,14 @@ export const removeMember = createAsyncThunk(
   }
 );
 
-const membershipSlice = createSlice({
-  name: 'memberships',
-  initialState,
-  reducers: {
-    clearMembershipError: (state) => {
-      state.error = null;
-    }
+const memberSlice = createSlice({
+  name: "members",
+  initialState: {
+    members: [],
+    loading: false,
+    error: null,
   },
+  reducers: {},
   extraReducers: (builder) => {
     builder
       .addCase(fetchMembers.pending, (state) => {
@@ -84,5 +84,5 @@ const membershipSlice = createSlice({
   }
 });
 
-export const { clearMembershipError } = membershipSlice.actions;
-export default membershipSlice.reducer;
+export const { clearMembershipError } = memberSlice.actions;
+export default memberSlice.reducer;

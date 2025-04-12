@@ -263,25 +263,31 @@ const OrganizationDashboard = () => {
 
   const handleBulkDepartmentChange = async () => {
     if (!selectedDepartment || selectedMembers.length === 0) {
-      setApiStatus({ type: 'error', message: 'Please select members and a department' });
+      setApiStatus({ type: "error", message: "Please select members and a department" });
       return;
     }
   
     try {
       await Promise.all(
-        selectedMembers.map(memberId => 
-          dispatch(assignMemberToDepartment({
-            orgId,
-            deptId: selectedDepartment,
-            memberId
-          }))
+        selectedMembers.map((memberId) =>
+          dispatch(
+            assignMemberToDepartment({
+              orgId,
+              deptId: selectedDepartment,
+              memberId,
+            })
+          ).unwrap()
         )
       );
+  
+      // Refresh members list
+      await dispatch(fetchMembers(orgId)).unwrap();
+  
       setSelectedMembers([]);
-      setSelectedDepartment('');
-      setApiStatus({ type: 'success', message: 'Members department updated successfully' });
+      setSelectedDepartment("");
+      setApiStatus({ type: "success", message: "Members department updated successfully" });
     } catch (error) {
-      setApiStatus({ type: 'error', message: error.message });
+      setApiStatus({ type: "error", message: error.message || "Failed to update department." });
     }
   };
 
@@ -386,11 +392,17 @@ const OrganizationDashboard = () => {
   };
 
   const DepartmentBadge = ({ department }) => {
-    if (!department) return null;
-    
+    if (!department) {
+      return (
+        <div className="px-3 py-1 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400 border border-gray-500/30">
+          No Department
+        </div>
+      );
+    }
+  
     return (
-      <div className="flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
-        <span>{department.name}</span>
+      <div className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+        {department.name}
       </div>
     );
   };
@@ -421,15 +433,15 @@ const OrganizationDashboard = () => {
   };
 
   const MemberCard = ({ member }) => {
-    const memberDepartment = departments.find(dept => dept._id === member.department?._id);
+    const memberDepartment = departments.find((dept) => dept._id === member.department?._id);
   
     return (
       <motion.div
         whileHover={{ scale: 1.01 }}
         className={`flex items-center justify-between p-4 bg-gray-700/30 border ${
-          selectedMembers.includes(member.user._id) 
-            ? 'border-blue-500' 
-            : 'border-gray-600'
+          selectedMembers.includes(member.user._id)
+            ? "border-blue-500"
+            : "border-gray-600"
         } rounded-lg mb-4`}
       >
         <div className="flex items-center space-x-4 flex-1 min-w-0">
@@ -442,7 +454,7 @@ const OrganizationDashboard = () => {
             />
           )}
           <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
-            {member.user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
+            {member.user?.firstName?.charAt(0)?.toUpperCase() || "U"}
           </div>
           <div className="min-w-0">
             <h3 className="font-medium text-white truncate">
@@ -463,32 +475,6 @@ const OrganizationDashboard = () => {
             </div>
           )}
           <RoleBadge role={member.role} />
-          {(isAdmin || isOwner) && (
-            <div className="flex space-x-2">
-              <button
-                onClick={() => {
-                  setSelectedMembers([member.user._id]);
-                  setSelectedRoleUpdate(member.role);
-                  setShowRoleUpdate(true);
-                }}
-                className="p-1.5 text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg"
-                title="Change role"
-              >
-                <Shield className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => {
-                  if (window.confirm(`Remove ${member.user.firstName} from organization?`)) {
-                    handleRemoveMember(member.user._id);
-                  }
-                }}
-                className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
-                title="Remove member"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          )}
         </div>
       </motion.div>
     );

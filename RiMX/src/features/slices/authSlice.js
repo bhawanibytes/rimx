@@ -1,4 +1,5 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import api from '../../services/api'; // Ensure the API service is imported
 
 // Load initial state from localStorage if available
 const loadInitialState = () => {
@@ -24,6 +25,58 @@ const loadInitialState = () => {
     accounts: []
   };
 };
+
+// Fetch user data
+export const fetchUserData = createAsyncThunk(
+  'auth/fetchUserData',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get('/v1/user/profile');
+      return response.data.user; // Ensure this matches the backend response
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch user data.');
+    }
+  }
+);
+
+// Edit user data
+export const editUserData = createAsyncThunk(
+  'auth/editUserData',
+  async (userData, { rejectWithValue }) => {
+    try {
+      const response = await api.put('/v1/user/profile', userData);
+      return response.data.user;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to update user data.');
+    }
+  }
+);
+
+// Change password
+export const changePassword = createAsyncThunk(
+  'auth/changePassword',
+  async ({ currentPassword, newPassword }, { rejectWithValue }) => {
+    try {
+      const response = await api.post('/v1/user/change-password', { currentPassword, newPassword });
+      return response.data.message;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to change password.');
+    }
+  }
+);
+
+// Delete account
+export const deleteAccount = createAsyncThunk(
+  'auth/deleteAccount',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.delete('/v1/user/account');
+      return response.data.message;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to delete account.');
+    }
+  }
+);
 
 const authSlice = createSlice({
   name: 'auth',
@@ -95,6 +148,49 @@ const authSlice = createSlice({
         }
       }
     }
+  },
+  extraReducers: (builder) => {
+    builder
+      // Fetch user data
+      .addCase(fetchUserData.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchUserData.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+      })
+      .addCase(fetchUserData.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // Edit user data
+      .addCase(editUserData.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(editUserData.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+      })
+      .addCase(editUserData.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // Change password
+      .addCase(changePassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(changePassword.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(changePassword.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
   },
 });
 
