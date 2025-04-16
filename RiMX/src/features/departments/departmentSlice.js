@@ -36,7 +36,7 @@ export const createDepartment = createAsyncThunk(
 );
 
 export const assignMemberToDepartment = createAsyncThunk(
-  'departments/assignMember',
+  "departments/assignMember",
   async ({ orgId, deptId, memberId }, { rejectWithValue }) => {
     try {
       const response = await api.post(
@@ -45,7 +45,7 @@ export const assignMemberToDepartment = createAsyncThunk(
       );
       return response.data.department;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to assign member to department.');
+      return rejectWithValue(error.response?.data?.message || "Failed to assign member to department.");
     }
   }
 );

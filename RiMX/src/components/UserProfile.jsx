@@ -22,14 +22,23 @@ import {
   Building,
   Users
 } from 'lucide-react';
+<<<<<<< HEAD
 import { editUserData, changePassword, deleteAccount, fetchUserData } from '../features/userprofile/userprofileSlice'; // Import the thunk
+=======
+import { editUserData, changePassword, deleteAccount } from '../features/slices/authSlice'; // Import the thunk
+>>>>>>> a66be082563da60871823eb7c87aba37b3244a9b
 import { fetchUserOrganizations } from '../features/organization/organizationSlice'; // Import the correct thunk
 
 const UserProfile = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+<<<<<<< HEAD
   const { user, loading: userLoading, error: userError } = useSelector((state) => state.userProfile);
   const { userOrganizations, loading: orgLoading, error: orgError } = useSelector((state) => state.organizations);
+=======
+  const { user } = useSelector((state) => state.auth);
+  const { userOrganizations, loading } = useSelector((state) => state.organizations); // Use the correct state
+>>>>>>> a66be082563da60871823eb7c87aba37b3244a9b
   const [isEditing, setIsEditing] = useState(false);
   const [apiStatus, setApiStatus] = useState({ type: null, message: null });
   const [formData, setFormData] = useState({
@@ -43,6 +52,7 @@ const UserProfile = () => {
     bio: ''
   });
   const orgId = localStorage.getItem('orgId');
+<<<<<<< HEAD
 
   useEffect(() => {
     dispatch(fetchUserData());
@@ -62,6 +72,8 @@ const UserProfile = () => {
       });
     }
   }, [user]);
+=======
+>>>>>>> a66be082563da60871823eb7c87aba37b3244a9b
 
   useEffect(() => {
     if (user) {
@@ -80,10 +92,13 @@ const UserProfile = () => {
       dispatch(fetchUserOrganizations(orgId));
     }
   }, [user,orgId, dispatch]);
+<<<<<<< HEAD
 
   useEffect(() => {
     console.log("User data from Redux:", user);
   }, [user]);
+=======
+>>>>>>> a66be082563da60871823eb7c87aba37b3244a9b
 
   const handleChange = (e) => {
     setFormData({
@@ -410,7 +425,11 @@ const UserProfile = () => {
                       <Building className="h-5 w-5 mr-2 text-blue-400" />
                       Organizations
                     </h2>
+<<<<<<< HEAD
                     {orgLoading ? (
+=======
+                    {loading ? (
+>>>>>>> a66be082563da60871823eb7c87aba37b3244a9b
                       <div className="flex justify-center py-4">
                         <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                       </div>
@@ -438,7 +457,11 @@ const UserProfile = () => {
                             <button
                               onClick={() => {
                                 localStorage.setItem('orgId', org._id);
+<<<<<<< HEAD
                                 navigate('/OrganizationDashboard', );
+=======
+                                navigate('/organization-dashboard');
+>>>>>>> a66be082563da60871823eb7c87aba37b3244a9b
                               }}
                               className="mt-3 text-xs text-blue-400 hover:text-blue-300 transition-all duration-300"
                             >

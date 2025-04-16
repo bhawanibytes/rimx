@@ -1,6 +1,7 @@
 import Department from '../models/Department.js';
 import Organization from '../models/Organization.js';
 import mongoose from 'mongoose';
+import Membership from "../models/Membership.js";
 
 // Create a new department
 export const createDepartment = async (req, res) => {
@@ -43,18 +44,56 @@ export const assignMemberToDepartment = async (req, res) => {
     const { orgId, deptId } = req.params;
     const { memberId } = req.body;
 
-    const department = await Department.findById(deptId);
-    if (!department || department.organization.toString() !== orgId) {
-      return res.status(404).json({ msg: 'Department not found.' });
+    // Handle "Remove from Department"
+    if (deptId === "remove") {
+      // Remove the member from all departments in the organization
+      const departments = await Department.find({ organization: orgId });
+      for (const department of departments) {
+        if (department.members.includes(memberId)) {
+          department.members = department.members.filter((id) => id.toString() !== memberId);
+          await department.save();
+        }
+      }
+
+      // Update the Membership model to remove the department reference
+      await Membership.findOneAndUpdate(
+        { organization: orgId, user: memberId },
+        { $unset: { department: "" } } // Remove the department field
+      );
+
+      return res.status(200).json({ success: true, message: "Member removed from all departments." });
     }
 
+    // Validate department and organization
+    const department = await Department.findById(deptId);
+    if (!department || department.organization.toString() !== orgId) {
+      return res.status(404).json({ success: false, message: "Department not found." });
+    }
+
+    // Prevent duplicate assignment
+    if (department.members.includes(memberId)) {
+      return res.status(400).json({ success: false, message: "Member is already in this department." });
+    }
+
+    // Add the member to the department
     department.members.push(memberId);
     await department.save();
 
-    res.status(200).json({ success: true, department });
+    // Update the Membership model with the new department
+    const updatedMembership = await Membership.findOneAndUpdate(
+      { organization: orgId, user: memberId },
+      { department: deptId }, // Update the department field
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedMembership) {
+      return res.status(404).json({ success: false, message: "Membership not found for the user." });
+    }
+
+    res.status(200).json({ success: true, department, membership: updatedMembership });
   } catch (error) {
-    console.error('Error assigning member to department:', error.message);
-    res.status(500).json({ success: false, message: 'Failed to assign member to department.' });
+    console.error("Error assigning member to department:", error.message);
+    res.status(500).json({ success: false, message: "Failed to assign member to department." });
   }
 };
 

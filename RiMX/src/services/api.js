@@ -236,4 +236,17 @@ export const assignMemberToDepartment = (orgId, deptId, memberId) =>
 export const deleteDepartment = (deptId) =>
   api.delete(`/v1/org/departments/${deptId}`);
 
+// Fetch user data
+export const fetchUserData = () => api.get('/v1/user/profile');
+
+// Edit user data
+export const editUserData = (userData) => api.put('/v1/user/profile', userData);
+
+// Change password
+export const changePassword = (currentPassword, newPassword) =>
+  api.post('/v1/user/change-password', { currentPassword, newPassword });
+
+// Delete account
+export const deleteAccount = () => api.delete('/v1/user/account');
+
 export default api;

@@ -49,6 +49,8 @@ import {
   fetchDepartments
 } from '../features/departments/departmentSlice';
 import { createTask, fetchTasks } from '../features/tasks/taskSlice';
+import { fetchPermissions } from '../features/permissions/permissionsSlice';
+import { hasPermission } from '../utils/permissions';
 
 const OrganizationDashboard = () => {
   const orgId = localStorage.getItem('orgId');
@@ -249,6 +251,10 @@ const OrganizationDashboard = () => {
     dispatch(fetchTasks(orgId));
   }, [dispatch, orgId]);
 
+  useEffect(() => {
+    dispatch(fetchPermissions(orgId));
+  }, [dispatch, orgId]);
+
   const handleDeleteOrg = async () => {
     try {
       await dispatch(deleteOrganization(orgId)).unwrap();
@@ -384,6 +390,7 @@ const OrganizationDashboard = () => {
         )
       );
   
+      // Refresh members list
       await dispatch(fetchMembers(orgId)).unwrap();
   
       setSelectedMembers([]);

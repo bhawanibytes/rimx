@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase";
+import { useDispatch } from 'react-redux';
+import { fetchUserData } from './features/slices/authSlice';
 import RiMXLandingPage from './pages/RiMXLandingPage'
 import Signup from './pages/Signup'
 import Terms from './components/Terms'
@@ -16,7 +18,11 @@ import Teams from './components/Teams'
 import Welcomepage from './pages/WelcomePage'
 import OrganizationDashboard from './pages/OrganizationDashboard'   
 import UserProfile from './components/UserProfile'
+<<<<<<< HEAD
 import Dashboard from './pages/Dashboard';
+=======
+
+>>>>>>> a66be082563da60871823eb7c87aba37b3244a9b
 const PrivateRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -36,6 +42,12 @@ const PrivateRoute = ({ children }) => {
 };
 
 const App = () => {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(fetchUserData()); // Fetch user data on app load
+  }, [dispatch]);
+
   return (
     <main style={{ marginTop: '60px' }}>
       <Router>
