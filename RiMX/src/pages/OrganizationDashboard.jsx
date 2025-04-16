@@ -25,6 +25,9 @@ import {
   Zap,
   AlertTriangle,
   Mail,
+  ClipboardList,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   fetchOrganizationDetails,
@@ -45,7 +48,7 @@ import {
   deleteDepartment,
   fetchDepartments
 } from '../features/departments/departmentSlice';
-// import api from '../services/api';
+import { createTask, fetchTasks } from '../features/tasks/taskSlice';
 
 const OrganizationDashboard = () => {
   const orgId = localStorage.getItem('orgId');
@@ -72,11 +75,91 @@ const OrganizationDashboard = () => {
   const [showDeleteDeptConfirm, setShowDeleteDeptConfirm] = useState(false);
   const [showRoleUpdate, setShowRoleUpdate] = useState(false);
   const [selectedRoleUpdate, setSelectedRoleUpdate] = useState('member');
+  const [showPermissions, setShowPermissions] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDescription, setTaskDescription] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState('');
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [selectedMemberForTask, setSelectedMemberForTask] = useState(null);
+
+  // Permissions hierarchy
+  const permissionsHierarchy = {
+    "owner": [
+      "create_department",
+      "edit_department",
+      "delete_department",
+      "assign_roles",
+      "revoke_roles",
+      "add_members",
+      "remove_members",
+      "view_all_users",
+      "approve_requests",
+      "access_all_reports",
+      "configure_settings",
+      "transfer_ownership",
+      "assign_tasks_to_all"
+    ],
+    "admin": [
+      "create_department",
+      "edit_department",
+      "assign_roles",
+      "add_members",
+      "remove_members",
+      "view_all_users",
+      "approve_requests",
+      "access_all_reports",
+      "assign_tasks_to_all"
+    ],
+    "manager": [
+      "assign_roles_department",
+      "add_members_department",
+      "remove_members_department",
+      "approve_leave_department",
+      "view_reports_department",
+      "assign_tasks",
+      "view_team",
+      "assign_tasks_to_team"
+    ],
+    "hr": [
+      "view_employee_details",
+      "manage_payroll",
+      "approve_leave",
+      "onboard_employee",
+      "offboard_employee",
+      "view_all_departments",
+      "edit_limited_profiles"
+    ],
+    "projectManager": [
+      "create_project",
+      "assign_team_leads",
+      "assign_project_tasks",
+      "track_task_progress",
+      "approve_task_completion",
+      "view_project_reports"
+    ],
+    "teamLead": [
+      "assign_team_tasks",
+      "view_team_progress",
+      "provide_feedback",
+      "request_new_members",
+      "approve_task_submissions"
+    ],
+    "employee": [
+      "view_tasks",
+      "submit_task_updates",
+      "submit_leave_request",
+      "view_project_info",
+      "edit_own_profile"
+    ],
+    "member": [
+      "view_assigned_tasks",
+      "submit_task_feedback",
+      "comment_on_tasks"
+    ]
+  };
 
   // Redux state
-  const { currentOrganization, loading: orgLoading } = useSelector(
-    (state) => state.organizations
-  );
+  const { currentOrganization, role, permissions, orgLoading } = useSelector((state) => state.organizations);
   const { members, loading: membersLoading } = useSelector(
     (state) => state.memberships
   );
@@ -87,8 +170,19 @@ const OrganizationDashboard = () => {
     (state) => state.departments
   );
   
+  const userRole = members?.find(m => m.user._id === userId)?.role || 'member';
   const isOwner = currentOrganization?.owner?.id === userId;
   const isAdmin = members?.find(m => m.user._id === userId)?.role === 'admin' || isOwner;
+  const isManager = userRole === 'manager';
+  const isTeamLead = userRole === 'teamLead';
+  const isProjectManager = userRole === 'projectManager';
+
+  // Check if user has specific permission
+  const hasPermission = (permission) => {
+    const membership = members?.find((m) => m.user._id === userId && m.organization === orgId);
+    const userRole = membership?.role || 'employee';
+    return permissionsHierarchy[userRole]?.includes(permission) || false;
+  };
 
   // Fetch data
   useEffect(() => {
@@ -114,6 +208,12 @@ const OrganizationDashboard = () => {
 
     fetchData();
   }, [orgId, activeTab, dispatch, navigate]);
+
+  useEffect(() => {
+    if (orgId) {
+      dispatch(fetchOrganizationDetails(orgId));
+    }
+  }, [dispatch, orgId]);
 
   useEffect(() => {
     if (currentOrganization) {
@@ -144,6 +244,10 @@ const OrganizationDashboard = () => {
       fetchDepartmentsData();
     }
   }, [orgId, dispatch]);
+
+  useEffect(() => {
+    dispatch(fetchTasks(orgId));
+  }, [dispatch, orgId]);
 
   const handleDeleteOrg = async () => {
     try {
@@ -184,7 +288,7 @@ const OrganizationDashboard = () => {
           orgId,
           email: inviteEmail,
           role: selectedRole,
-          department: selectedDepartment || null, // Pass null if no department is selected
+          department: selectedDepartment || null,
         })
       ).unwrap();
       setInviteEmail('');
@@ -206,7 +310,7 @@ const OrganizationDashboard = () => {
         createDepartment({
           name: newDeptName,
           description: newDeptDescription,
-        orgId, // Ensure orgId is passed correctly
+          orgId,
         })
       ).unwrap();
   
@@ -249,7 +353,7 @@ const OrganizationDashboard = () => {
 
   const confirmDeleteDepartment = async () => {
     try {
-      await dispatch(deleteDepartment(editingDept._id)).unwrap(); // Use the department ID
+      await dispatch(deleteDepartment(editingDept._id)).unwrap();
       setShowDeleteDeptConfirm(false);
       setEditingDept(null);
       setApiStatus({ type: 'success', message: 'Department deleted successfully' });
@@ -263,25 +367,30 @@ const OrganizationDashboard = () => {
 
   const handleBulkDepartmentChange = async () => {
     if (!selectedDepartment || selectedMembers.length === 0) {
-      setApiStatus({ type: 'error', message: 'Please select members and a department' });
+      setApiStatus({ type: "error", message: "Please select members and a department" });
       return;
     }
   
     try {
       await Promise.all(
-        selectedMembers.map(memberId => 
-          dispatch(assignMemberToDepartment({
-            orgId,
-            deptId: selectedDepartment,
-            memberId
-          }))
+        selectedMembers.map((memberId) =>
+          dispatch(
+            assignMemberToDepartment({
+              orgId,
+              deptId: selectedDepartment,
+              memberId,
+            })
+          ).unwrap()
         )
       );
+  
+      await dispatch(fetchMembers(orgId)).unwrap();
+  
       setSelectedMembers([]);
-      setSelectedDepartment('');
-      setApiStatus({ type: 'success', message: 'Members department updated successfully' });
+      setSelectedDepartment("");
+      setApiStatus({ type: "success", message: "Members department updated successfully" });
     } catch (error) {
-      setApiStatus({ type: 'error', message: error.message });
+      setApiStatus({ type: "error", message: error.message || "Failed to update department." });
     }
   };
 
@@ -357,8 +466,37 @@ const OrganizationDashboard = () => {
         message: `${selectedMembers.length} member${selectedMembers.length > 1 ? 's' : ''} removed successfully` 
       });
       
-      // Refresh members list
       dispatch(fetchMembers(orgId));
+    } catch (error) {
+      setApiStatus({ type: 'error', message: error.message });
+    }
+  };
+
+  const handleAssignTask = async (memberId) => {
+    if (!taskTitle.trim() || !taskDescription.trim()) {
+      setApiStatus({ type: 'error', message: 'Title and description are required' });
+      return;
+    }
+
+    try {
+      await dispatch(
+        createTask({
+          orgId,
+          task: {
+            title: taskTitle,
+            description: taskDescription,
+            dueDate: taskDueDate,
+            assignedTo: memberId,
+          },
+        })
+      ).unwrap();
+      
+      setTaskTitle('');
+      setTaskDescription('');
+      setTaskDueDate('');
+      setShowTaskForm(false);
+      setSelectedMemberForTask(null);
+      setApiStatus({ type: 'success', message: 'Task assigned successfully' });
     } catch (error) {
       setApiStatus({ type: 'error', message: error.message });
     }
@@ -386,11 +524,17 @@ const OrganizationDashboard = () => {
   };
 
   const DepartmentBadge = ({ department }) => {
-    if (!department) return null;
-    
+    if (!department) {
+      return (
+        <div className="px-3 py-1 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400 border border-gray-500/30">
+          No Department
+        </div>
+      );
+    }
+  
     return (
-      <div className="flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
-        <span>{department.name}</span>
+      <div className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+        {department.name}
       </div>
     );
   };
@@ -420,16 +564,125 @@ const OrganizationDashboard = () => {
     );
   };
 
+  const PermissionsDropdown = () => {
+    const [showPermissions, setShowPermissions] = useState(false);
+    const { role, permissions } = useSelector((state) => state.organizations);
+  
+    console.log('Role:', role);
+    console.log('Permissions:', permissions);
+  
+    if (!role || !permissions.length) {
+      console.warn('Role or permissions are not available.');
+      return null; // Return nothing if role or permissions are not available
+    }
+  
+    return (
+      <div className="mt-6">
+        <button
+          onClick={() => setShowPermissions(!showPermissions)}
+          className="flex items-center text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          {showPermissions ? (
+            <ChevronUp className="h-4 w-4 mr-1" />
+          ) : (
+            <ChevronDown className="h-4 w-4 mr-1" />
+          )}
+          View Permissions for {role.charAt(0).toUpperCase() + role.slice(1)} Role
+        </button>
+  
+        {showPermissions && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="mt-4 p-4 bg-gray-700/30 border border-gray-600 rounded-lg"
+          >
+            <h4 className="text-sm font-medium text-gray-400 mb-2">Your Permissions:</h4>
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {permissions.map((permission, index) => (
+                <li key={index} className="flex items-center">
+                  <Check className="h-3 w-3 text-green-400 mr-2" />
+                  <span className="text-sm text-gray-300">{permission.replace(/_/g, ' ')}</span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+      </div>
+    );
+  };
+
+  const TaskAssignmentForm = ({ memberId, onCancel }) => {
+    return (
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+        className="mt-4 p-4 bg-gray-700/30 border border-gray-600 rounded-lg"
+      >
+        <h3 className="text-lg font-medium text-white mb-4">Assign New Task</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Title</label>
+            <input
+              type="text"
+              value={taskTitle}
+              onChange={(e) => setTaskTitle(e.target.value)}
+              placeholder="Task title"
+              className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Description</label>
+            <textarea
+              value={taskDescription}
+              onChange={(e) => setTaskDescription(e.target.value)}
+              placeholder="Task description"
+              rows={3}
+              className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Due Date (optional)</label>
+            <input
+              type="date"
+              value={taskDueDate}
+              onChange={(e) => setTaskDueDate(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            />
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 text-gray-300 bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleAssignTask(memberId)}
+              className="px-4 py-2 text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all"
+            >
+              Assign Task
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
   const MemberCard = ({ member }) => {
-    const memberDepartment = departments.find(dept => dept._id === member.department?._id);
+    const memberDepartment = departments.find((dept) => dept._id === member.department?._id);
+    const canAssignTask = 
+      (hasPermission('assign_tasks_to_all') && (member.role !== 'owner' && member.role !== 'admin')) ||
+      (hasPermission('assign_tasks_to_team') && memberDepartment && 
+        members.find(m => m.user._id === userId)?.department?._id === memberDepartment._id) ||
+      (hasPermission('assign_tasks') && member.role === 'employee');
   
     return (
       <motion.div
         whileHover={{ scale: 1.01 }}
         className={`flex items-center justify-between p-4 bg-gray-700/30 border ${
-          selectedMembers.includes(member.user._id) 
-            ? 'border-blue-500' 
-            : 'border-gray-600'
+          selectedMembers.includes(member.user._id)
+            ? "border-blue-500"
+            : "border-gray-600"
         } rounded-lg mb-4`}
       >
         <div className="flex items-center space-x-4 flex-1 min-w-0">
@@ -442,7 +695,7 @@ const OrganizationDashboard = () => {
             />
           )}
           <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
-            {member.user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
+            {member.user?.firstName?.charAt(0)?.toUpperCase() || "U"}
           </div>
           <div className="min-w-0">
             <h3 className="font-medium text-white truncate">
@@ -463,33 +716,30 @@ const OrganizationDashboard = () => {
             </div>
           )}
           <RoleBadge role={member.role} />
-          {(isAdmin || isOwner) && (
-            <div className="flex space-x-2">
-              <button
-                onClick={() => {
-                  setSelectedMembers([member.user._id]);
-                  setSelectedRoleUpdate(member.role);
-                  setShowRoleUpdate(true);
-                }}
-                className="p-1.5 text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg"
-                title="Change role"
-              >
-                <Shield className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => {
-                  if (window.confirm(`Remove ${member.user.firstName} from organization?`)) {
-                    handleRemoveMember(member.user._id);
-                  }
-                }}
-                className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
-                title="Remove member"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
+          
+          {canAssignTask && (
+            <button
+              onClick={() => {
+                setSelectedMemberForTask(selectedMemberForTask === member.user._id ? null : member.user._id);
+                setShowTaskForm(selectedMemberForTask !== member.user._id);
+              }}
+              className="p-2 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
+              title="Assign Task"
+            >
+              <ClipboardList className="h-4 w-4" />
+            </button>
           )}
         </div>
+        
+        {selectedMemberForTask === member.user._id && showTaskForm && (
+          <TaskAssignmentForm 
+            memberId={member.user._id} 
+            onCancel={() => {
+              setSelectedMemberForTask(null);
+              setShowTaskForm(false);
+            }} 
+          />
+        )}
       </motion.div>
     );
   };
@@ -532,52 +782,6 @@ const OrganizationDashboard = () => {
     </motion.div>
   );
 
-  const ProblemCard = ({ problem }) => (
-    <motion.div
-      whileHover={{ scale: 1.01 }}
-      className="p-4 bg-gray-700/30 border border-gray-600 rounded-lg mb-4"
-    >
-      <div className="flex justify-between items-start">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-white truncate">{problem.title}</h3>
-          <p className="text-sm text-gray-400 mt-1">{problem.description}</p>
-          <div className="flex items-center mt-2 space-x-4">
-            <span className="text-xs text-gray-400">
-              Created: {new Date(problem.createdAt).toLocaleDateString()}
-            </span>
-            <span className="text-xs text-gray-400">
-              Status: <span className={`${problem.status === 'open' ? 'text-green-400' : 'text-yellow-400'}`}>
-                {problem.status}
-              </span>
-            </span>
-          </div>
-        </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => alert(`Problem details: ${problem.description}`)}
-            className="px-3 py-1.5 text-sm bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-lg"
-          >
-            Show Details
-          </button>
-          <button
-            onClick={() => alert(`Contacting ${problem.createdBy?.name || 'creator'} about this issue`)}
-            className="px-3 py-1.5 text-sm bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 rounded-lg"
-          >
-            Contact
-          </button>
-        </div>
-      </div>
-      <div className="mt-3 flex items-center text-xs text-gray-400">
-        <div className="h-6 w-6 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/20 mr-2">
-          {problem.createdBy?.firstName?.charAt(0)?.toUpperCase() || 'U'}
-        </div>
-        <span>
-          {problem.createdBy?.firstName} {problem.createdBy?.lastName} • {problem.department?.name || 'No Department'}
-        </span>
-      </div>
-    </motion.div>
-  );
-
   const DepartmentCard = ({ department }) => (
     <motion.div
       whileHover={{ scale: 1.01 }}
@@ -615,11 +819,7 @@ const OrganizationDashboard = () => {
   );
 
   if (orgLoading) {
-    return (
-      <div className="flex justify-center items-center h-screen bg-gray-900">
-        <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
-      </div>
-    );
+    return <div className="text-gray-400">Loading permissions...</div>;
   }
 
   if (!currentOrganization) {
@@ -667,6 +867,13 @@ const OrganizationDashboard = () => {
             </div>
           </div>
           <div className="flex items-center space-x-3">
+            <button
+              onClick={() => navigate('/dashboard')} // Navigate to the user's dashboard
+              className="flex items-center px-4 py-2 bg-gradient-to-r from-green-500 to-blue-600 text-white rounded-lg hover:from-green-600 hover:to-blue-700 transition-all"
+            >
+              <LayoutDashboard className="h-4 w-4 mr-2" />
+              User Dashboard
+            </button>
             <button
               onClick={() => setIsEditing(true)}
               className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all"
@@ -890,7 +1097,6 @@ const OrganizationDashboard = () => {
               { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
               { id: 'members', icon: Users, label: 'Members' },
               { id: 'departments', icon: Briefcase, label: 'Departments' },
-              // { id: 'problems', icon: AlertTriangle, label: 'Problems' },
               { id: 'invite', icon: UserPlus, label: 'Invite' },
               { id: 'requests', icon: Clock, label: 'Requests' },
             ].map((tab) => (
@@ -1050,6 +1256,9 @@ const OrganizationDashboard = () => {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Permissions dropdown */}
+                  <PermissionsDropdown />
                 </div>
               </div>
             )}
@@ -1072,8 +1281,7 @@ const OrganizationDashboard = () => {
                         <>
                           <button
                             onClick={() => { setIsInviting(true); setActiveTab('invite'); }}
-                            className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500
-                                                        to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all"
+                            className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all"
                           >
                             <Plus className="h-5 w-5 mr-2" />
                             Add Members
@@ -1095,7 +1303,7 @@ const OrganizationDashboard = () => {
                             {selectedMembers.length} member{selectedMembers.length > 1 ? 's' : ''} selected
                           </h3>
                           <p className="text-xs text-gray-400">
-                            You can change the department for these selected members
+                            Bulk actions for selected members
                           </p>
                         </div>
                         
@@ -1130,6 +1338,16 @@ const OrganizationDashboard = () => {
                               Update Department
                             </button>
                             <button
+                              onClick={() => setShowRoleUpdate(!showRoleUpdate)}
+                              className={`px-4 py-2 text-sm rounded-lg flex-1 ${
+                                showRoleUpdate 
+                                  ? 'bg-purple-500 hover:bg-purple-600 text-white' 
+                                  : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                              } transition-colors`}
+                            >
+                              Change Role
+                            </button>
+                            <button
                               onClick={() => setSelectedMembers([])}
                               className="px-3 py-2 text-gray-300 bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors"
                               title="Clear selection"
@@ -1139,6 +1357,33 @@ const OrganizationDashboard = () => {
                           </div>
                         </div>
                         
+                        {showRoleUpdate && (
+                          <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3 items-start sm:items-center pt-3">
+                            <div className="flex-1 w-full">
+                              <label className="block text-xs font-medium text-gray-400 mb-1">Select New Role</label>
+                              <select
+                                value={selectedRoleUpdate}
+                                onChange={(e) => setSelectedRoleUpdate(e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white text-sm"
+                              >
+                                <option value="owner">Owner</option>
+                                <option value="manager">Manager</option>
+                                <option value="hr">HR</option>
+                                <option value="projectManager">Project Manager</option>
+                                <option value="teamLead">Team Lead</option>
+                                <option value="employee">Employee</option>
+                                <option value="member">Member</option>
+                              </select>
+                            </div>
+                            <button
+                              onClick={handleBulkRoleUpdate}
+                              className="px-4 py-2 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors"
+                            >
+                              Update Roles
+                            </button>
+                          </div>
+                        )}
+
                         {selectedDepartment === 'remove' && (
                           <div className="text-xs text-yellow-400 mt-2">
                             <AlertTriangle className="inline h-3 w-3 mr-1" />
@@ -1216,44 +1461,6 @@ const OrganizationDashboard = () => {
                 </div>
               </div>
             )}
-
-            {/* Problems Tab */}
-            {/* {activeTab === 'problems' && (
-              <div className="bg-gray-800/50 rounded-xl border border-gray-700 backdrop-blur-sm overflow-hidden">
-                <div className="p-8">
-                  <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-2xl font-bold text-white">Reported Problems</h2>
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={() => dispatch(fetchProblems(orgId))}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
-                        title="Refresh"
-                      >
-                        <RefreshCw className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {problemsLoading ? (
-                    <div className="flex justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                    </div>
-                  ) : problems?.length > 0 ? (
-                    <div className="space-y-3">
-                      {problems.map((problem) => (
-                        <ProblemCard key={problem._id} problem={problem} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <AlertTriangle className="mx-auto h-12 w-12 text-gray-500" />
-                      <h3 className="mt-4 text-lg font-medium text-white">No Problems Reported</h3>
-                      <p className="mt-1 text-gray-400">All systems operational</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )} */}
 
             {/* Invite Members Tab */}
             {activeTab === 'invite' && (

@@ -1,7 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import {
   createOrganization as createOrgAPI,
-  fetchUserOrganizations as fetchUserOrgsAPI,
   getOrganizationDetails,
   deleteOrganization as deleteOrgAPI,
   updateOrganization as updateOrgAPI // Import the update API
@@ -18,10 +17,10 @@ const initialState = {
 // Thunk to fetch user's organizations (owner or member)
 export const fetchUserOrganizations = createAsyncThunk(
   'organizations/fetchUserOrganizations',
-  async (orgId, { rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get(`/v1/org/organizations/${orgId}/myOrganizations`);
-      return response.data.organizations; // Return the list of organizations
+      const response = await api.get('/v1/org/user/organizations');
+      return response.data.organizations;
     } catch (error) {
       console.error('Error fetching user organizations:', error.response?.data || error.message);
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch user organizations.');

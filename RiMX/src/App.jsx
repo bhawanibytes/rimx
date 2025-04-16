@@ -15,8 +15,8 @@ import Pricing from './components/Pricing'
 import Teams from './components/Teams'
 import Welcomepage from './pages/WelcomePage'
 import OrganizationDashboard from './pages/OrganizationDashboard'   
-// import UserProfile from './components/UserProfile'
-
+import UserProfile from './components/UserProfile'
+import Dashboard from './pages/Dashboard';
 const PrivateRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -46,7 +46,7 @@ const App = () => {
           <Route path='/signup' element={<Signup/>}/>
           <Route path='/login' element={<LoginForm/>}/>
           <Route path='/ContactPage' element={<ContactPage/>}/>
-          {/* <Route path ='/UserProfile' element={<PrivateRoute><UserProfile/></PrivateRoute>}/> */}
+          <Route path ='/UserProfile' element={<PrivateRoute><UserProfile/></PrivateRoute>}/>
           <Route 
             path='/WelcomePage' 
             element={
@@ -67,6 +67,7 @@ const App = () => {
           <Route path='/Features' element={<Features/>}/>
           <Route path='/Pricing' element={<Pricing/>}/>
           <Route path='/Teams' element={<Teams/>}/>
+          <Route path="/Dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         </Routes>
         <Footer/> 
       </Router>

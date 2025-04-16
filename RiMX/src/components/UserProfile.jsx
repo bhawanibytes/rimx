@@ -22,13 +22,14 @@ import {
   Building,
   Users
 } from 'lucide-react';
-import { updateUserProfile } from '../features/auth/authSlice';
-import api from '../services/api';
+import { editUserData, changePassword, deleteAccount, fetchUserData } from '../features/userprofile/userprofileSlice'; // Import the thunk
+import { fetchUserOrganizations } from '../features/organization/organizationSlice'; // Import the correct thunk
 
 const UserProfile = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const { user, loading: userLoading, error: userError } = useSelector((state) => state.userProfile);
+  const { userOrganizations, loading: orgLoading, error: orgError } = useSelector((state) => state.organizations);
   const [isEditing, setIsEditing] = useState(false);
   const [apiStatus, setApiStatus] = useState({ type: null, message: null });
   const [formData, setFormData] = useState({
@@ -41,8 +42,26 @@ const UserProfile = () => {
     dateOfBirth: '',
     bio: ''
   });
-  const [organizations, setOrganizations] = useState([]);
-  const [loadingOrgs, setLoadingOrgs] = useState(true);
+  const orgId = localStorage.getItem('orgId');
+
+  useEffect(() => {
+    dispatch(fetchUserData());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.emailId || '',
+        mobileNumber: user.mobileNumber || '',
+        address: user.address || '',
+        country: user.country || '',
+        dateOfBirth: user.dateOfBirth || '',
+        bio: user.bio || '',
+      });
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -57,20 +76,13 @@ const UserProfile = () => {
         bio: user.bio || ''
       });
       
-      // Fetch user's organizations
-      const fetchUserOrganizations = async () => {
-        try {
-          const response = await api.get('/v1/org/user/organizations');
-          setOrganizations(response.data.organizations);
-          setLoadingOrgs(false);
-        } catch (error) {
-          setApiStatus({ type: 'error', message: 'Failed to load organizations' });
-          setLoadingOrgs(false);
-        }
-      };
-      
-      fetchUserOrganizations();
+      // Fetch user's organizations using the correct thunk
+      dispatch(fetchUserOrganizations(orgId));
     }
+  }, [user,orgId, dispatch]);
+
+  useEffect(() => {
+    console.log("User data from Redux:", user);
   }, [user]);
 
   const handleChange = (e) => {
@@ -83,11 +95,40 @@ const UserProfile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await dispatch(updateUserProfile(formData)).unwrap();
+      await dispatch(editUserData(formData)).unwrap();
       setIsEditing(false);
       setApiStatus({ type: 'success', message: 'Profile updated successfully' });
     } catch (error) {
       setApiStatus({ type: 'error', message: error.message });
+    }
+  };
+
+  // Handle change password
+  const handleChangePassword = async () => {
+    try {
+      const currentPassword = prompt('Enter your current password:');
+      const newPassword = prompt('Enter your new password:');
+      if (!currentPassword || !newPassword) {
+        setApiStatus({ type: 'error', message: 'Password fields cannot be empty.' });
+        return;
+      }
+      await dispatch(changePassword({ currentPassword, newPassword })).unwrap();
+      setApiStatus({ type: 'success', message: 'Password changed successfully' });
+    } catch (error) {
+      setApiStatus({ type: 'error', message: error.message });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      try {
+        await dispatch(deleteAccount()).unwrap();
+        setApiStatus({ type: 'success', message: 'Account deleted successfully' });
+        dispatch(logout()); // Log the user out
+        navigate('/login');
+      } catch (error) {
+        setApiStatus({ type: 'error', message: error.message });
+      }
     }
   };
 
@@ -126,6 +167,14 @@ const UserProfile = () => {
     });
   };
 
+  if (userLoading || orgLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (userError || orgError) {
+    return <div>Error: {userError || orgError}</div>;
+  }
+
   if (!user) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-900">
@@ -144,7 +193,7 @@ const UserProfile = () => {
       >
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link to="/dashboard" className="text-blue-400 hover:text-blue-300">
+            <Link to="/WelcomePage" className="text-blue-400 hover:text-blue-300">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <div className="flex items-center space-x-2">
@@ -306,7 +355,7 @@ const UserProfile = () => {
                     <div>
                       <h3 className="text-sm font-medium text-gray-400 mb-1">Full Name</h3>
                       <p className="text-white">
-                        {user.firstName} {user.lastName}
+                        {user?.firstName} {user?.lastName}
                       </p>
                     </div>
                     <div>
@@ -361,19 +410,19 @@ const UserProfile = () => {
                       <Building className="h-5 w-5 mr-2 text-blue-400" />
                       Organizations
                     </h2>
-                    {loadingOrgs ? (
+                    {orgLoading ? (
                       <div className="flex justify-center py-4">
                         <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                       </div>
-                    ) : organizations.length > 0 ? (
+                    ) : userOrganizations.length > 0 ? (
                       <div className="space-y-3">
-                        {organizations.map((org) => (
+                        {userOrganizations.map((org) => (
                           <motion.div
                             key={org._id}
                             whileHover={{ scale: 1.01 }}
                             className="p-4 bg-gray-700/30 border border-gray-600 rounded-lg"
                           >
-                            <h3 className="font-medium text-white">{org.organization.name}</h3>
+                            <h3 className="font-medium text-white">{org.name}</h3>
                             <div className="flex items-center mt-2 space-x-4">
                               <span className="text-xs text-gray-400 flex items-center">
                                 <Shield className="h-3 w-3 mr-1" />
@@ -388,8 +437,8 @@ const UserProfile = () => {
                             </div>
                             <button
                               onClick={() => {
-                                localStorage.setItem('orgId', org.organization._id);
-                                navigate('/organization-dashboard');
+                                localStorage.setItem('orgId', org._id);
+                                navigate('/OrganizationDashboard', );
                               }}
                               className="mt-3 text-xs text-blue-400 hover:text-blue-300 transition-all duration-300"
                             >
@@ -418,7 +467,7 @@ const UserProfile = () => {
                         Update your password to keep your account secure
                       </p>
                       <button
-                        onClick={() => navigate('/change-password')}
+                        onClick={handleChangePassword}
                         className="px-4 py-2 text-sm bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-lg transition-all duration-300"
                       >
                         Change Password
@@ -430,11 +479,7 @@ const UserProfile = () => {
                         Permanently delete your account and all associated data
                       </p>
                       <button
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-                            // Handle account deletion
-                          }
-                        }}
+                        onClick={handleDeleteAccount}
                         className="px-4 py-2 text-sm bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg transition-all duration-300"
                       >
                         Delete Account

@@ -1,7 +1,7 @@
 import Organization from '../models/Organization.js';
 import User from '../models/userModel.js'; // Import the User model
 import mongoose from 'mongoose';
-// import Membership from '../models/Membership.js';
+import Membership from '../models/Membership.js';
 // import Invitation from '../models/Invitation.js';
 // import generateToken from '../utils/tokenLogic.js';
 // Controller to create an organization
@@ -47,32 +47,44 @@ export const createOrganization = async (req, res) => {
 
 // Controller to fetch organizations for a user
 export const fetchUserOrganizations = async (req, res) => {
-    try {
-        const { userId } = req.query;
+  try {
+    const userId = req.user.id; // Use the authenticated user's ID
 
-        // Validate query parameter
-        if (!userId) {
-            return res.status(400).json({
-                success: false,
-                message: 'User ID is required to fetch organizations.',
-            });
-        }
+    // Fetch organizations where the user is the owner
+    const ownedOrganizations = await Organization.find({ owner: userId }).select(
+      'name description createdAt owner'
+    );
 
-        // Fetch organizations from the database
-        const organizations = await Organization.find({ owner: userId });
+    // Fetch organizations where the user is a member
+    const memberOrganizations = await Membership.find({ user: userId })
+      .populate('organization', 'name description createdAt owner') // Populate organization details
+      .select('organization role');
 
-        return res.status(200).json({
-            success: true,
-            organizations,
-        });
-    } catch (error) {
-        console.error('Error fetching organizations:', error.message);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch organizations.',
-            error: error.message,
-        });
-    }
+    // Combine owned and member organizations
+    const organizations = [
+      ...ownedOrganizations.map((org) => ({
+        _id: org._id,
+        name: org.name,
+        description: org.description,
+        createdAt: org.createdAt,
+        owner: org.owner,
+        role: 'owner',
+      })),
+      ...memberOrganizations.map((membership) => ({
+        _id: membership.organization._id,
+        name: membership.organization.name,
+        description: membership.organization.description,
+        createdAt: membership.organization.createdAt,
+        owner: membership.organization.owner,
+        role: membership.role,
+      })),
+    ];
+
+    res.status(200).json({ success: true, organizations });
+  } catch (error) {
+    console.error('Error fetching user organizations:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch user organizations.' });
+  }
 };
 
 // Controller to fetch a single organization by ID
@@ -238,4 +250,42 @@ export const deleteOrganization = async (req, res) => {
 //     });
 //   }
 // };
+
+export const fetchOrganizationDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Validate the organization ID
+        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid organization ID.',
+            });
+        }
+
+        // Fetch the organization details
+        const organization = await Organization.findById(id)
+            .populate('owner', 'firstName lastName emailId') // Populate owner details
+            .populate('createdBy', 'firstName lastName emailId'); // Populate createdBy details
+
+        if (!organization) {
+            return res.status(404).json({
+                success: false,
+                message: 'Organization not found.',
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            organization,
+        });
+    } catch (error) {
+        console.error('Error fetching organization details:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch organization details.',
+            error: error.message,
+        });
+    }
+};
 

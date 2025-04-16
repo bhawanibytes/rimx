@@ -1,6 +1,6 @@
 import express from 'express';
 import auth, { authorizeOrganizationAccess } from '../middlewares/auth.js';
-import { createOrganization,  getOrganizationById,updateOrganization} from '../controllers/organizationcontroller.js';
+import { createOrganization,  getOrganizationById,updateOrganization, fetchOrganizationDetails, fetchUserOrganizations } from '../controllers/organizationcontroller.js';
 import Membership from '../models/Membership.js';
 import mongoose from 'mongoose';
 import Organization from '../models/Organization.js';
@@ -22,40 +22,10 @@ router.post('/', auth, createOrganization);
 router.get('/:id', getOrganizationById);
 router.put('/:id', auth, updateOrganization);
 
-
-
 // @route   GET /v1/api/organizations/:id
 // @desc    Get organization details
 // @access  Private (must be member)
-router.get('/:id', auth, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ msg: 'Invalid organization ID.' });
-    }
-
-    const membership = await Membership.findOne({
-      user: req.user.id,
-      organization: id,
-    }).populate('organization');
-
-    if (!membership) {
-      return res.status(404).json({ msg: 'Organization not found or access denied' });
-    }
-
-    res.json({
-      id: membership.organization._id,
-      name: membership.organization.name,
-      createdAt: membership.organization.createdAt,
-      createdBy: membership.organization.createdBy,
-      role: membership.role,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('Server Error');
-  }
-});
+router.get('/:id', auth, fetchOrganizationDetails);
 
 router.delete('/:id', auth, async (req, res) => {
   try {
@@ -250,5 +220,10 @@ router.get('/:orgId/dashboard', auth, authorizeOrganizationAccess, async (req, r
     res.status(500).json({ success: false, message: 'Failed to fetch organization dashboard.' });
   }
 });
+
+// @route   GET /v1/org/user/organizations
+// @desc    Get organizations where the user is the owner or a member
+// @access  Private
+router.get('/user/organizations', auth, fetchUserOrganizations);
 
 export default router;
