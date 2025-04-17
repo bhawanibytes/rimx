@@ -1,12 +1,13 @@
 import User from '../models/userModel.js';
 import { hashPassword, isHashMatched } from '../utils/hashingLogic.js';
 import generateToken from '../utils/tokenLogic.js';
-// const { verifyToken } = require("../utils/verifyToken");
+import jwt from 'jsonwebtoken';
 
 const signup = async (req, res) => {
     try {
         const { firstName, lastName, emailId, password } = req.body;
-        //returns request if any one things is not submitted
+
+        // Returns error if any required field is missing
         if (!firstName || !lastName || !emailId || !password) {
             return res.status(400).json({
                 success: false,
@@ -14,30 +15,29 @@ const signup = async (req, res) => {
             });
         }
 
-        //find whether user already exists
-        const user = await User.findOne({ emailId })
+        // Check if the user already exists
+        const user = await User.findOne({ emailId });
         if (user) {
             return res.status(400).json({ message: "User already exists", navigate: '/login' });
-        } else {
-            try {
-                const hashedPassword = await hashPassword(password)
-                const newUser = new User({ firstName, lastName, emailId, password: hashedPassword })
-                await newUser.save();
-                return res.status(201).json({ message: "User created successfully" });
-            } catch (error) {
-                return res.status(400).json({ response: "Error while saving User to DB", message: error.message });
-            }
         }
+
+        // Hash the password and save the user
+        const hashedPassword = await hashPassword(password);
+        const newUser = new User({ firstName, lastName, emailId, password: hashedPassword });
+        await newUser.save();
+
+        return res.status(201).json({ message: "User created successfully" });
     } catch (error) {
-        console.log(error)
+        console.error("Error during signup:", error.message);
         return res.status(500).json({ message: error.message });
     }
-}
+};
 
 const login = async (req, res) => {
     try {
         const { emailId, password } = req.body;
-        //returns request if any one things is not submitted
+
+        // Returns error if any required field is missing
         if (!emailId || !password) {
             return res.status(400).json({
                 success: false,
@@ -45,51 +45,68 @@ const login = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({ emailId })
+        // Find the user by email
+        const user = await User.findOne({ emailId });
         if (!user) {
-            return res.json({
-                message: `User doesn't exist`
-            })
-        } else {
-            const match = await isHashMatched(password, user.password)
-            if (match) {
-                const token = generateToken({emailId})
-                return res.json({
-                    success: true,
-                    message: 'loggedIn',
-                    token
-                })
-            } else {
-                return res.json({ message: `Password is incorrect` })
-            }
+            return res.status(404).json({
+                success: false,
+                message: `User doesn't exist`,
+            });
         }
+
+        // Check if the password matches
+        const match = await isHashMatched(password, user.password);
+        if (!match) {
+            return res.status(401).json({
+                success: false,
+                message: `Password is incorrect`,
+            });
+        }
+
+        // Generate a valid JWT token
+        const token = generateToken({ id: user._id });
+
+        // Return the required JSON response
+        return res.status(200).json({
+            success: true,
+            message: 'loggedIn',
+            token,
+            // userId: user._id,
+            user: {
+                id: user._id, // MongoDB ID
+                name: `${user.firstName} ${user.lastName}`, // Full name
+                email: user.emailId, // Email
+            },
+        });
     } catch (error) {
-        return res.json({ message: error.message })
+        console.error("Error during login:", error.message);
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
     }
-}
+};
 
-// const verify = async (req, res) => { }
+const auth = (req, res, next) => {
+    const authHeader = req.headers.authorization;
 
-// const resendOTP = async (req, res) => { }
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Authorization header is missing or invalid' });
+    }
 
-// const logout = async (req, res) => { }
+    const token = authHeader.split(' ')[1]; // Extract the token
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded; // Attach the decoded payload to the request
+        next();
+    } catch (error) {
+        return res.status(401).json({ message: 'Invalid token' });
+    }
+};
 
-// const forgotPassword = async (req, res) => { }
-
-// const resetPassword = async (req, res) => { }
-
-// const updatePassword = async (req, res) => { }
-
-
-
+export default auth;
 
 export {
     signup,
     login,
-    // verify,
-    // resendOTP,
-    // logout,
-    // forgotPassword,
-    // resetPassword,
-    // updatePassword
-}
+};

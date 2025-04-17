@@ -1,30 +1,88 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import connectDB from '../config/db.js';
-import cors from 'cors'
-//importing routes
-import { authRouter } from '../routes/auth.js'
+import express from "express";
+import dotenv from "dotenv";
+import connectDB from "../config/db.js";
+import cors from "cors";
+import authRouter from "../routes/auth.js"; // Assuming this exists
+import organizationRouter from "../routes/organizations.js"; // Import the updated organization router
+import auth from "../middlewares/auth.js"; // Import the auth middleware
+import joinRequests from "../routes/joinRequests.js";
+import inviteRouter from "../routes/invitations.js"; // Import the invitation router
+import membersRouter from "../routes/membersRoutes.js"; // Import the members routes
+import departmentRouter from "../routes/departmentRoutes.js"; // Import the department routes
+import userRouter from "../routes/userRoutes.js";
+import reportRouter from '../routes/reportRoutes.js'; // Import the report routes
+import taskRouter from '../routes/taskRoutes.js'; // Import the task routes
 
 const app = express();
-//injecting environment variables
+
+// Inject environment variables
 dotenv.config();
-connectDB()
-const corsOption ={
+connectDB();
+
+const corsOption = {
   origin: process.env.CORS_FRONTEND,
-  optionSuccessStatus: 200
-}
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  optionsSuccessStatus: 200,
+};
 
-app.use(cors(corsOption))
+app.use(cors(corsOption));
 
-//express body parser
-app.use(express.json())
+// Express body parser
+app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.status(200).json({ 'Message': 'Server is running' });
+// Basic route
+app.get("/", (req, res) => {
+  res.status(200).json({ Message: "Server is running" });});
+app.get("/", (req, res) => {
+  res.status(200).json({ Message: "Server is running" });
+});
+app.use("/v1/auth", authRouter);
+app.use("/v1/auth", authRouter);
+
+// Organization routes (without auth middleware)
+app.use("/v1/auth", authRouter);
+app.use("/v1/org/organizations", auth, inviteRouter);
+app.use("/v1/org/user", auth, inviteRouter);
+app.use("/v1/org/organizations", auth, organizationRouter);
+app.use("/v1/org/organizations", auth, organizationRouter);
+app.use("/v1/invitations", auth, inviteRouter);
+app.use("/v1/org/user", auth, inviteRouter);
+app.use("/v1/org/organizations", auth, joinRequests);
+app.use("/v1/org/organizations", auth, membersRouter); // Add members routes
+app.use("/v1/user", userRouter); // Add the user routes
+
+// Report routes
+app.use('/v1', reportRouter);
+
+// Task routes
+app.use('/v1/org', taskRouter);
+app.use('/v1/org', organizationRouter);
+app.use("/v1/org/organizations", auth, departmentRouter);
+app.use("/v1/org/departments", auth, departmentRouter);
+// Error handling middleware (should be last)
+app.use((err, req, res, next) => {
+
+  res.status(500).json({
+    success: false,
+    error: "Server error",
+    message: err.message,
+    error: "Server error",
+    message: err.message,
+  });
+});
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    success: false,
+    error: "Server error",
+    message: err.message,
+  });
 });
 
-app.use('/v1/auth', authRouter);
-
-app.listen(3000, () => {
-  console.log('Server is running on port 3000');
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
+
+export default app;
+
