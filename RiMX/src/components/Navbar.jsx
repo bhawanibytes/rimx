@@ -32,9 +32,11 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
-      console.log("User logged out");
-      navigate("/login");
+      // Dispatch the logout action
+      dispatch(logout());
+
+      // Navigate to the login page
+      navigate('/login');
     } catch (err) {
       console.error("Logout error:", err);
     }
@@ -125,12 +127,10 @@ const Navbar = () => {
                       {user?.avatar ? (
                         <img src={user.avatar} alt="Profile" className="w-full h-full rounded-full" />
                       ) : (
-                        <User size={16} className="text-white" />
+                        <User size={18} className="text-white" />
                       )}
                     </div>
-                    <span className="text-sm font-medium text-white">
-                      {user?.name || "Account"}
-                    </span>
+                    <span className="text-sm font-medium text-white">{user?.name || "Account"}</span>
                     <ChevronDown size={16} className={`text-gray-300 transition-transform ${accountDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
 
@@ -145,10 +145,6 @@ const Navbar = () => {
                       onMouseLeave={() => setAccountDropdownOpen(false)}
                     >
                       <div className="py-1">
-                        <div className="px-4 py-2 text-sm text-gray-300 border-b border-gray-700">
-                          <p className="font-medium">{user?.email || "user@example.com"}</p>
-                        </div>
-                        
                         <Link
                           to="/UserProfile"
                           className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50"
@@ -157,45 +153,6 @@ const Navbar = () => {
                           <User size={16} className="mr-3" />
                           Your Profile
                         </Link>
-                        
-                        <Link
-                          to="/account/settings"
-                          className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50"
-                          onClick={() => setAccountDropdownOpen(false)}
-                        >
-                          <Settings size={16} className="mr-3" />
-                          Settings
-                        </Link>
-                        
-                        <div className="border-t border-gray-700"></div>
-                        
-                        <button
-                          className="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50"
-                          onClick={handleAddAccount}
-                        >
-                          <PlusCircle size={16} className="mr-3" />
-                          Add Account
-                        </button>
-                        
-                        {accounts.length > 1 && (
-                          <>
-                            <div className="border-t border-gray-700"></div>
-                            <div className="px-3 py-2 text-xs text-gray-400">Switch to:</div>
-                            {accounts.filter(acc => acc.user.id !== user.id).map(account => (
-                              <button
-                                key={account.user.id}
-                                className="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50"
-                                onClick={() => handleSwitchAccount(account.user.id)}
-                              >
-                                <Users size={16} className="mr-3" />
-                                {account.user.name}
-                              </button>
-                            ))}
-                          </>
-                        )}
-                        
-                        <div className="border-t border-gray-700"></div>
-                        
                         <button
                           onClick={handleLogout}
                           className="flex items-center w-full px-4 py-2 text-sm text-red-400 hover:bg-gray-700/50"
@@ -211,14 +168,12 @@ const Navbar = () => {
                 <>
                   <Link
                     to="/login"
-                    state={{ from: location.pathname }}
                     className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors"
                   >
                     Log in
                   </Link>
                   <Link
                     to="/signup"
-                    state={{ from: location.pathname }}
                     className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all shadow-md"
                   >
                     Sign up

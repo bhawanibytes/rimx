@@ -1,6 +1,5 @@
 import express from 'express';
-import auth, { authorizeOrganizationAccess } from '../middlewares/auth.js';
-import { checkPermission } from '../middlewares/permissions.js';
+import auth from '../middlewares/auth.js';
 import {
   createOrganization,
   getOrganizationById,
@@ -18,30 +17,28 @@ import JoinRequest from '../models/joinRequest.js';
 
 const router = express.Router();
 
-// @route   POST /v1/api/organizations
-// @desc    Create a new organization
-// @access  Private (requires "create_department" permission)
-router.post('/', auth, checkPermission('create_department'), createOrganization);
+// Allow users to create an organization (no membership required)
+router.post('/', auth, createOrganization);
 
 // @route   GET /v1/api/organizations/:id
 // @desc    Get organization details
-// @access  Private (requires "view_all_users" permission)
-router.get('/:id', auth, checkPermission('view_all_users'), getOrganizationById);
+// @access  Private
+router.get('/:id', auth, getOrganizationById);
 
 // @route   PUT /v1/api/organizations/:id
 // @desc    Update organization details
-// @access  Private (requires "configure_settings" permission)
-router.put('/:id', auth, checkPermission('configure_settings'), updateOrganization);
+// @access  Private
+router.put('/:id', auth, updateOrganization);
 
 // @route   GET /v1/api/organizations/:id
 // @desc    Fetch organization details
-// @access  Private (requires "view_all_users" permission)
-router.get('/:id', auth, checkPermission('view_all_users'), fetchOrganizationDetails);
+// @access  Private
+router.get('/:id', auth, fetchOrganizationDetails);
 
 // @route   DELETE /v1/api/organizations/:id
 // @desc    Delete an organization
-// @access  Private (requires "delete_department" permission)
-router.delete('/:id', auth, checkPermission('delete_department'), async (req, res) => {
+// @access  Private
+router.delete('/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -66,8 +63,8 @@ router.delete('/:id', auth, checkPermission('delete_department'), async (req, re
 
 // @route   GET /v1/org/organizations/all
 // @desc    Get all organizations
-// @access  Private (requires "view_all_users" permission)
-router.get('/retrieve/allOrganizations', auth, checkPermission('view_all_users'), async (req, res) => {
+// @access  Private
+router.get('/retrieve/allOrganizations', auth,  async (req, res) => {
   try {
     const userId = req.user.id; // Authenticated user's ID
 
@@ -101,8 +98,8 @@ router.get('/retrieve/allOrganizations', auth, checkPermission('view_all_users')
 
 // @route   GET /v1/org/organizations/myOrganizations
 // @desc    Get organizations where the user is the owner or a member
-// @access  Private (requires "view_all_users" permission)
-router.get('/:id/myOrganizations', auth, checkPermission('view_all_users'), async (req, res) => {
+// @access  Private
+router.get('/:id/myOrganizations', auth, async (req, res) => {
   try {
     console.log('Authenticated user object:', req.user);
 
@@ -161,8 +158,8 @@ router.get('/:id/myOrganizations', auth, checkPermission('view_all_users'), asyn
 
 // @route   GET /v1/org/organizations/:orgId/dashboard
 // @desc    Fetch organization dashboard
-// @access  Private (requires "view_all_users" permission)
-router.get('/:orgId/dashboard', auth, authorizeOrganizationAccess, checkPermission('view_all_users'), async (req, res) => {
+// @access  Private
+router.get('/:orgId/dashboard', auth, async (req, res) => {
   try {
     const { orgId } = req.params;
 
@@ -178,9 +175,7 @@ router.get('/:orgId/dashboard', auth, authorizeOrganizationAccess, checkPermissi
   }
 });
 
-// @route   GET /v1/org/user/organizations
-// @desc    Get organizations where the user is the owner or a member
-// @access  Private (requires "view_all_users" permission)
-router.get('/user/organizations', auth, checkPermission('view_all_users'), fetchUserOrganizations);
+// Fetch organizations (no membership required)
+router.get('/user/organizations', auth, fetchUserOrganizations);
 
 export default router;

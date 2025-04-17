@@ -1,12 +1,22 @@
 import Report from '../models/Report.js';
 import Membership from '../models/Membership.js';
+import Department from '../models/Department.js';
 
 // Create a new report
 export const createReport = async (req, res) => {
   try {
+    console.log('Request body:', req.body);
     const { title, description, status, taskId } = req.body;
     const userId = req.user._id;
-    const organizationId = req.user.organizationId;
+    const {orgId} = req.params;
+
+    //  Find the user's department
+    const membership = await Membership.findOne({ user: userId, organization: orgId }).populate('department');
+    if (!membership || !membership.department) {
+       return res.status(400).json({ success: false, message: 'User does not belong to any department.' });
+     }
+
+     const departmentId = membership.department._id;
 
     const newReport = await Report.create({
       title,
@@ -14,7 +24,8 @@ export const createReport = async (req, res) => {
       status,
       taskId,
       userId,
-      organizationId,
+      organizationId: orgId,
+      departmentId, // Include department reference
     });
 
     res.status(201).json({ success: true, report: newReport });
@@ -24,33 +35,16 @@ export const createReport = async (req, res) => {
   }
 };
 
-// Fetch reports based on user role
+// Fetch reports submitted by the logged-in user
 export const fetchReports = async (req, res) => {
   try {
     const userId = req.user._id;
-    const organizationId = req.user.organizationId;
 
-    // Check the user's role
-    const membership = await Membership.findOne({ user: userId, organization: organizationId });
-    if (!membership) {
-      return res.status(403).json({ success: false, message: 'Access denied.' });
-    }
-
-    const role = membership.role;
-
-    // Fetch reports based on role
-    let reports;
-    if (role === 'owner') {
-      // Owner sees only failure reports
-      reports = await Report.find({ organizationId, status: 'failure' })
-        .populate('taskId', 'title')
-        .populate('userId', 'firstName lastName');
-    } else {
-      // Other members see both success and failure reports
-      reports = await Report.find({ organizationId })
-        .populate('taskId', 'title')
-        .populate('userId', 'firstName lastName');
-    }
+    // Fetch reports submitted by the logged-in user
+    const reports = await Report.find({ userId })
+      .populate('taskId', 'title')
+      .populate('departmentId', 'name') // Populate department details
+      .populate('userId', 'firstName lastName');
 
     res.status(200).json({ success: true, reports });
   } catch (error) {

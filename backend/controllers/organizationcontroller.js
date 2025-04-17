@@ -48,7 +48,7 @@ export const createOrganization = async (req, res) => {
 // Controller to fetch organizations for a user
 export const fetchUserOrganizations = async (req, res) => {
   try {
-    const userId = req.user.id; // Use the authenticated user's ID
+    const userId = req.user._id;
 
     // Fetch organizations where the user is the owner
     const ownedOrganizations = await Organization.find({ owner: userId }).select(

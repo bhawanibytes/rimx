@@ -1,11 +1,10 @@
 import express from 'express';
-import { fetchReports } from '../controllers/reportController.js';
+import { fetchReports , createReport} from '../controllers/reportController.js';
 import auth from '../middlewares/auth.js';
-import { checkPermission } from '../middlewares/permissions.js';
 
 const reportRouter = express.Router();
 
-// Fetch reports (requires "access_all_reports" permission)
-reportRouter.get('/:orgId/reports', auth, checkPermission('access_all_reports'), fetchReports);
-
+// Fetch reports
+reportRouter.get('/:orgId/reports', auth, fetchReports);
+reportRouter.post('/:orgId/createReports', auth, createReport);
 export default reportRouter;

@@ -120,9 +120,12 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
-      
+
+      // Clear localStorage
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userId');
       }
     },
     setLoading: (state, action) => {

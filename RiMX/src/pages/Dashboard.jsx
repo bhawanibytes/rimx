@@ -39,20 +39,21 @@ import {
   Filter,
   Search
 } from 'lucide-react';
+import {
+  fetchTasks, updateTaskStatus, deleteTask
+} from '../features/tasks/taskSlice';
 import { 
-  fetchTasks, 
   submitReport, 
   clearApiStatus, 
   fetchReports,
-  updateTaskStatus,
-  deleteTask
 } from '../features/dashboard/dashboardSlice';
 
 const Dashboard = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const userId = localStorage.getItem('userId');
-  const { tasks, loading, apiStatus, reports } = useSelector((state) => state.dashboard);
+  const orgId = localStorage.getItem('orgId');
+  const { tasks = [] } = useSelector((state) => state.task || {}); // Safely access tasks with a default value
+  const { loading, apiStatus, reports = [] } = useSelector((state) => state.dashboard);
   const [activeTab, setActiveTab] = useState('overview');
   const [showReportForm, setShowReportForm] = useState(false);
   const [reportData, setReportData] = useState({
@@ -70,25 +71,23 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (activeTab === 'tasks' || activeTab === 'overview') {
-      dispatch(fetchTasks(userId));
-    } 
-    if (activeTab === 'reports' || activeTab === 'overview') {
-      dispatch(fetchReports());
+      dispatch(fetchTasks(orgId)).then((response) => {
+        console.log('Fetched tasks:', response.payload);
+      });
     }
-  }, [dispatch, userId, activeTab]);
-
-  const handleReportChange = (e) => {
-    const { name, value } = e.target;
-    setReportData({
-      ...reportData,
-      [name]: value
-    });
-  };
-
+    if (activeTab === 'reports' || activeTab === 'overview') {
+      dispatch(fetchReports(orgId)).then((response) => {
+        console.log('Fetched reports:', response.payload);
+      });
+    }
+  }, [dispatch, orgId, activeTab]);
+    
+  console.log('Tasks from Redux:', tasks);
   const handleSubmitReport = async (e) => {
     e.preventDefault();
+    console.log('Submitting report with data:', reportData);
     try {
-      await dispatch(submitReport({ ...reportData, userId })).unwrap();
+      await dispatch(submitReport({ reportData, userId: orgId ,orgId})).unwrap();
       setReportData({ title: '', taskId: '', description: '', status: 'success' });
       setShowReportForm(false);
       dispatch(clearApiStatus());
@@ -98,6 +97,14 @@ const Dashboard = () => {
     }
   };
 
+  const handleReportChange = (e) => {
+    const { name, value } = e.target;
+    setReportData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const toggleTaskExpand = (taskId) => {
     setExpandedTask(expandedTask === taskId ? null : taskId);
   };
@@ -105,7 +112,7 @@ const Dashboard = () => {
   const handleStatusUpdate = async (taskId, newStatus) => {
     try {
       await dispatch(updateTaskStatus({ taskId, status: newStatus })).unwrap();
-      dispatch(fetchTasks(userId));
+      dispatch(fetchTasks(orgId)); // Changed to use orgId instead of userId
     } catch (error) {
       console.error('Error updating task status:', error);
     }
@@ -114,7 +121,7 @@ const Dashboard = () => {
   const confirmDeleteTask = async () => {
     try {
       await dispatch(deleteTask(taskToDelete)).unwrap();
-      dispatch(fetchTasks(userId));
+      dispatch(fetchTasks(orgId)); // Changed to use orgId instead of userId
       setShowDeleteConfirm(false);
       setTaskToDelete(null);
     } catch (error) {
@@ -168,22 +175,23 @@ const Dashboard = () => {
     return task.progress || 0;
   };
 
-  const filteredTasks = tasks.filter(task => 
+  const filteredTasks = tasks?.filter(task => 
     task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
     task.organization?.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) || [];
 
-  const filteredReports = reports.filter(report => 
+  const filteredReports = (reports || []).filter(report => 
     report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     report.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
     report.organization?.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const taskStatusCounts = tasks.reduce((acc, task) => {
-    acc[task.status] = (acc[task.status] || 0) + 1;
+  const taskStatusCounts = tasks?.reduce((acc, task) => {
+    const status = task.status.toLowerCase(); // Normalize status to lowercase
+    acc[status] = (acc[status] || 0) + 1;
     return acc;
-  }, {});
+  }, {}) || {};
 
   if (loading) {
     return (
@@ -261,7 +269,7 @@ const Dashboard = () => {
               
               <div className="flex items-center space-x-2">
                 <div className="h-8 w-8 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-medium">
-                  {userId?.charAt(0).toUpperCase() || 'U'}
+                  {orgId?.charAt(0).toUpperCase() || 'U'}
                 </div>
               </div>
             </div>
@@ -292,7 +300,7 @@ const Dashboard = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium text-gray-400">Total Tasks</p>
-                          <h3 className="text-2xl font-bold mt-1 text-white">{tasks.length}</h3>
+                          <h3 className="text-2xl font-bold mt-1 text-white">{tasks?.length || 0}</h3>
                         </div>
                         <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
                           <ClipboardList className="h-6 w-6 text-blue-400" />
@@ -303,11 +311,11 @@ const Dashboard = () => {
                     <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 backdrop-blur-sm">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-gray-400">Completed</p>
-                          <h3 className="text-2xl font-bold mt-1 text-white">{taskStatusCounts['Completed'] || 0}</h3>
+                          <p className="text-sm font-medium text-gray-400">In Progress</p>
+                          <h3 className="text-2xl font-bold mt-1 text-white">{taskStatusCounts['in-progress'] || 0}</h3>
                         </div>
-                        <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                          <CheckCircle className="h-6 w-6 text-green-400" />
+                        <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                          <Activity className="h-6 w-6 text-yellow-400" />
                         </div>
                       </div>
                     </div>
@@ -315,11 +323,11 @@ const Dashboard = () => {
                     <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 backdrop-blur-sm">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-gray-400">In Progress</p>
-                          <h3 className="text-2xl font-bold mt-1 text-white">{taskStatusCounts['In Progress'] || 0}</h3>
+                          <p className="text-sm font-medium text-gray-400">Completed</p>
+                          <h3 className="text-2xl font-bold mt-1 text-white">{taskStatusCounts['completed'] || 0}</h3>
                         </div>
-                        <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-                          <Activity className="h-6 w-6 text-yellow-400" />
+                        <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                          <CheckCircle className="h-6 w-6 text-green-400" />
                         </div>
                       </div>
                     </div>
@@ -815,7 +823,7 @@ const Dashboard = () => {
                       className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-white"
                     >
                       <option value="">Select Task</option>
-                      {tasks.map(task => (
+                      {tasks?.map(task => (
                         <option key={task._id} value={task._id}>
                           {task.title} - {task.organization?.name || 'No Organization'}
                         </option>

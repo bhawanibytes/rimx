@@ -48,9 +48,12 @@ import {
   deleteDepartment,
   fetchDepartments
 } from '../features/departments/departmentSlice';
-import { createTask, fetchTasks } from '../features/tasks/taskSlice';
-import { fetchPermissions } from '../features/permissions/permissionsSlice';
-import { hasPermission } from '../utils/permissions';
+import {
+  fetchAssignedTasks,
+  createTask,
+  deleteTask,
+  updateTask,
+} from '../features/tasks/taskSlice';
 
 const OrganizationDashboard = () => {
   const orgId = localStorage.getItem('orgId');
@@ -77,91 +80,15 @@ const OrganizationDashboard = () => {
   const [showDeleteDeptConfirm, setShowDeleteDeptConfirm] = useState(false);
   const [showRoleUpdate, setShowRoleUpdate] = useState(false);
   const [selectedRoleUpdate, setSelectedRoleUpdate] = useState('member');
-  const [showPermissions, setShowPermissions] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [selectedMemberForTask, setSelectedMemberForTask] = useState(null);
-
-  // Permissions hierarchy
-  const permissionsHierarchy = {
-    "owner": [
-      "create_department",
-      "edit_department",
-      "delete_department",
-      "assign_roles",
-      "revoke_roles",
-      "add_members",
-      "remove_members",
-      "view_all_users",
-      "approve_requests",
-      "access_all_reports",
-      "configure_settings",
-      "transfer_ownership",
-      "assign_tasks_to_all"
-    ],
-    "admin": [
-      "create_department",
-      "edit_department",
-      "assign_roles",
-      "add_members",
-      "remove_members",
-      "view_all_users",
-      "approve_requests",
-      "access_all_reports",
-      "assign_tasks_to_all"
-    ],
-    "manager": [
-      "assign_roles_department",
-      "add_members_department",
-      "remove_members_department",
-      "approve_leave_department",
-      "view_reports_department",
-      "assign_tasks",
-      "view_team",
-      "assign_tasks_to_team"
-    ],
-    "hr": [
-      "view_employee_details",
-      "manage_payroll",
-      "approve_leave",
-      "onboard_employee",
-      "offboard_employee",
-      "view_all_departments",
-      "edit_limited_profiles"
-    ],
-    "projectManager": [
-      "create_project",
-      "assign_team_leads",
-      "assign_project_tasks",
-      "track_task_progress",
-      "approve_task_completion",
-      "view_project_reports"
-    ],
-    "teamLead": [
-      "assign_team_tasks",
-      "view_team_progress",
-      "provide_feedback",
-      "request_new_members",
-      "approve_task_submissions"
-    ],
-    "employee": [
-      "view_tasks",
-      "submit_task_updates",
-      "submit_leave_request",
-      "view_project_info",
-      "edit_own_profile"
-    ],
-    "member": [
-      "view_assigned_tasks",
-      "submit_task_feedback",
-      "comment_on_tasks"
-    ]
-  };
+  const [assignedTasks, setAssignedTasks] = useState([]);
 
   // Redux state
-  const { currentOrganization, role, permissions, orgLoading } = useSelector((state) => state.organizations);
+  const { currentOrganization, orgLoading } = useSelector((state) => state.organizations);
   const { members, loading: membersLoading } = useSelector(
     (state) => state.memberships
   );
@@ -171,6 +98,7 @@ const OrganizationDashboard = () => {
   const { departments, loading: deptLoading } = useSelector(
     (state) => state.departments
   );
+  const { tasks = [], loading: tasksLoading } = useSelector((state) => state.tasks || {});
   
   const userRole = members?.find(m => m.user._id === userId)?.role || 'member';
   const isOwner = currentOrganization?.owner?.id === userId;
@@ -178,13 +106,6 @@ const OrganizationDashboard = () => {
   const isManager = userRole === 'manager';
   const isTeamLead = userRole === 'teamLead';
   const isProjectManager = userRole === 'projectManager';
-
-  // Check if user has specific permission
-  const hasPermission = (permission) => {
-    const membership = members?.find((m) => m.user._id === userId && m.organization === orgId);
-    const userRole = membership?.role || 'employee';
-    return permissionsHierarchy[userRole]?.includes(permission) || false;
-  };
 
   // Fetch data
   useEffect(() => {
@@ -248,12 +169,19 @@ const OrganizationDashboard = () => {
   }, [orgId, dispatch]);
 
   useEffect(() => {
-    dispatch(fetchTasks(orgId));
-  }, [dispatch, orgId]);
-
-  useEffect(() => {
-    dispatch(fetchPermissions(orgId));
-  }, [dispatch, orgId]);
+    if (orgId && activeTab === 'tasksAssigned') {
+      const fetchAssignedTasksData = async () => {
+        try {
+          const response = await dispatch(fetchAssignedTasks(orgId)).unwrap();
+          setAssignedTasks(response || []); // Ensure assignedTasks state is updated
+        } catch (error) {
+          console.error('Failed to fetch assigned tasks:', error);
+          setApiStatus({ type: 'error', message: 'Failed to fetch assigned tasks' });
+        }
+      };
+      fetchAssignedTasksData();
+    }
+  }, [activeTab, orgId, dispatch]);
 
   const handleDeleteOrg = async () => {
     try {
@@ -489,11 +417,12 @@ const OrganizationDashboard = () => {
       await dispatch(
         createTask({
           orgId,
+          
           task: {
             title: taskTitle,
             description: taskDescription,
             dueDate: taskDueDate,
-            assignedTo: memberId,
+            assignedTo: memberId,department: selectedDepartment ,
           },
         })
       ).unwrap();
@@ -504,6 +433,24 @@ const OrganizationDashboard = () => {
       setShowTaskForm(false);
       setSelectedMemberForTask(null);
       setApiStatus({ type: 'success', message: 'Task assigned successfully' });
+    } catch (error) {
+      setApiStatus({ type: 'error', message: error.message });
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    try {
+      await dispatch(deleteTask({ orgId, taskId })).unwrap(); // Ensure orgId and taskId are passed
+      setApiStatus({ type: 'success', message: 'Task deleted successfully' });
+    } catch (error) {
+      setApiStatus({ type: 'error', message: error.message });
+    }
+  };
+
+  const handleUpdateTask = async (taskId) => {
+    try {
+      await dispatch(updateTask({ taskId, updatedData: { title: 'Updated Title' } })).unwrap();
+      setApiStatus({ type: 'success', message: 'Task updated successfully' });
     } catch (error) {
       setApiStatus({ type: 'error', message: error.message });
     }
@@ -571,54 +518,43 @@ const OrganizationDashboard = () => {
     );
   };
 
-  const PermissionsDropdown = () => {
-    const [showPermissions, setShowPermissions] = useState(false);
-    const { role, permissions } = useSelector((state) => state.organizations);
-  
-    console.log('Role:', role);
-    console.log('Permissions:', permissions);
-  
-    if (!role || !permissions.length) {
-      console.warn('Role or permissions are not available.');
-      return null; // Return nothing if role or permissions are not available
-    }
-  
-    return (
-      <div className="mt-6">
-        <button
-          onClick={() => setShowPermissions(!showPermissions)}
-          className="flex items-center text-blue-400 hover:text-blue-300 transition-colors"
-        >
-          {showPermissions ? (
-            <ChevronUp className="h-4 w-4 mr-1" />
-          ) : (
-            <ChevronDown className="h-4 w-4 mr-1" />
-          )}
-          View Permissions for {role.charAt(0).toUpperCase() + role.slice(1)} Role
-        </button>
-  
-        {showPermissions && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            className="mt-4 p-4 bg-gray-700/30 border border-gray-600 rounded-lg"
-          >
-            <h4 className="text-sm font-medium text-gray-400 mb-2">Your Permissions:</h4>
-            <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {permissions.map((permission, index) => (
-                <li key={index} className="flex items-center">
-                  <Check className="h-3 w-3 text-green-400 mr-2" />
-                  <span className="text-sm text-gray-300">{permission.replace(/_/g, ' ')}</span>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-        )}
-      </div>
-    );
-  };
-
   const TaskAssignmentForm = ({ memberId, onCancel }) => {
+    const [localTaskTitle, setLocalTaskTitle] = useState('');
+    const [localTaskDescription, setLocalTaskDescription] = useState('');
+    const [localTaskDueDate, setLocalTaskDueDate] = useState('');
+
+    const handleSubmit = async (e) => {
+      e.preventDefault(); // Prevent form refresh
+      if (!localTaskTitle.trim() || !localTaskDescription.trim()) {
+        setApiStatus({ type: 'error', message: 'Title and description are required' });
+        return;
+      }
+
+      try {
+        await dispatch(
+          createTask({
+            orgId,
+            task: {
+              title: localTaskTitle,
+              description: localTaskDescription,
+              dueDate: localTaskDueDate,
+              assignedTo: memberId,
+              department: selectedDepartment,
+            },
+          })
+        ).unwrap();
+
+        setLocalTaskTitle('');
+        setLocalTaskDescription('');
+        setLocalTaskDueDate('');
+        setShowTaskForm(false);
+        setSelectedMemberForTask(null);
+        setApiStatus({ type: 'success', message: 'Task assigned successfully' });
+      } catch (error) {
+        setApiStatus({ type: 'error', message: error.message });
+      }
+    };
+
     return (
       <motion.div
         initial={{ opacity: 0, height: 0 }}
@@ -626,13 +562,13 @@ const OrganizationDashboard = () => {
         className="mt-4 p-4 bg-gray-700/30 border border-gray-600 rounded-lg"
       >
         <h3 className="text-lg font-medium text-white mb-4">Assign New Task</h3>
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Title</label>
             <input
               type="text"
-              value={taskTitle}
-              onChange={(e) => setTaskTitle(e.target.value)}
+              value={localTaskTitle}
+              onChange={(e) => setLocalTaskTitle(e.target.value)}
               placeholder="Task title"
               className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
             />
@@ -640,8 +576,8 @@ const OrganizationDashboard = () => {
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Description</label>
             <textarea
-              value={taskDescription}
-              onChange={(e) => setTaskDescription(e.target.value)}
+              value={localTaskDescription}
+              onChange={(e) => setLocalTaskDescription(e.target.value)}
               placeholder="Task description"
               rows={3}
               className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
@@ -651,8 +587,78 @@ const OrganizationDashboard = () => {
             <label className="block text-sm font-medium text-gray-400 mb-1">Due Date (optional)</label>
             <input
               type="date"
-              value={taskDueDate}
-              onChange={(e) => setTaskDueDate(e.target.value)}
+              value={localTaskDueDate}
+              onChange={(e) => setLocalTaskDueDate(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            />
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-gray-300 bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all"
+            >
+              Assign Task
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    );
+  };
+
+  const UpdateTaskForm = ({ task, onCancel }) => {
+    const [title, setTitle] = useState(task.title);
+    const [description, setDescription] = useState(task.description);
+    const [dueDate, setDueDate] = useState(task.dueDate ? task.dueDate.split('T')[0] : '');
+  
+    const handleSubmit = async () => {
+      try {
+        await dispatch(updateTask({ taskId: task._id, updatedData: { title, description, dueDate } })).unwrap();
+        setApiStatus({ type: 'success', message: 'Task updated successfully' });
+        onCancel();
+      } catch (error) {
+        setApiStatus({ type: 'error', message: error.message });
+      }
+    };
+  
+    return (
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+        className="mt-4 p-4 bg-gray-700/30 border border-gray-600 rounded-lg"
+      >
+        <h3 className="text-lg font-medium text-white mb-4">Update Task</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Due Date</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
               className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
             />
           </div>
@@ -664,10 +670,10 @@ const OrganizationDashboard = () => {
               Cancel
             </button>
             <button
-              onClick={() => handleAssignTask(memberId)}
+              onClick={handleSubmit}
               className="px-4 py-2 text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all"
             >
-              Assign Task
+              Update Task
             </button>
           </div>
         </div>
@@ -677,30 +683,22 @@ const OrganizationDashboard = () => {
 
   const MemberCard = ({ member }) => {
     const memberDepartment = departments.find((dept) => dept._id === member.department?._id);
-    const canAssignTask = 
-      (hasPermission('assign_tasks_to_all') && (member.role !== 'owner' && member.role !== 'admin')) ||
-      (hasPermission('assign_tasks_to_team') && memberDepartment && 
-        members.find(m => m.user._id === userId)?.department?._id === memberDepartment._id) ||
-      (hasPermission('assign_tasks') && member.role === 'employee');
-  
+    const isSelected = selectedMembers.includes(member.user._id);
+
     return (
       <motion.div
         whileHover={{ scale: 1.01 }}
         className={`flex items-center justify-between p-4 bg-gray-700/30 border ${
-          selectedMembers.includes(member.user._id)
-            ? "border-blue-500"
-            : "border-gray-600"
+          isSelected ? "border-blue-500" : "border-gray-600"
         } rounded-lg mb-4`}
       >
         <div className="flex items-center space-x-4 flex-1 min-w-0">
-          {(isAdmin || isOwner) && (
-            <input
-              type="checkbox"
-              checked={selectedMembers.includes(member.user._id)}
-              onChange={() => toggleMemberSelection(member.user._id)}
-              className="h-5 w-5 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-            />
-          )}
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => toggleMemberSelection(member.user._id)}
+            className="h-5 w-5 text-blue-500 border-gray-600 rounded focus:ring-blue-500"
+          />
           <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
             {member.user?.firstName?.charAt(0)?.toUpperCase() || "U"}
           </div>
@@ -711,7 +709,7 @@ const OrganizationDashboard = () => {
             <p className="text-sm text-gray-400 truncate">{member.user?.emailId}</p>
           </div>
         </div>
-  
+
         <div className="flex items-center space-x-4">
           {memberDepartment ? (
             <div className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
@@ -723,21 +721,18 @@ const OrganizationDashboard = () => {
             </div>
           )}
           <RoleBadge role={member.role} />
-          
-          {canAssignTask && (
-            <button
-              onClick={() => {
-                setSelectedMemberForTask(selectedMemberForTask === member.user._id ? null : member.user._id);
-                setShowTaskForm(selectedMemberForTask !== member.user._id);
-              }}
-              className="p-2 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
-              title="Assign Task"
-            >
-              <ClipboardList className="h-4 w-4" />
-            </button>
-          )}
+          <button
+            onClick={() => {
+              setSelectedMemberForTask(selectedMemberForTask === member.user._id ? null : member.user._id);
+              setShowTaskForm(selectedMemberForTask !== member.user._id);
+            }}
+            className="p-2 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
+            title="Assign Task"
+          >
+            <ClipboardList className="h-4 w-4" />
+          </button>
         </div>
-        
+
         {selectedMemberForTask === member.user._id && showTaskForm && (
           <TaskAssignmentForm 
             memberId={member.user._id} 
@@ -750,7 +745,7 @@ const OrganizationDashboard = () => {
       </motion.div>
     );
   };
-  
+
   const RequestCard = ({ request }) => (
     <motion.div
       whileHover={{ scale: 1.01 }}
@@ -824,6 +819,103 @@ const OrganizationDashboard = () => {
       </div>
     </motion.div>
   );
+
+  const TasksAssignedTab = () => {
+    const [editingTask, setEditingTask] = useState(null);
+
+    console.log('Rendering Assigned Tasks:', assignedTasks); // Debugging log
+
+    const handleUpdateTask = (task) => {
+      setEditingTask(task); // Open the update form with the selected task
+    };
+
+    const handleCancelUpdate = () => {
+      setEditingTask(null); // Close the update form
+    };
+
+    const handleRefreshTasks = async () => {
+      try {
+        const response = await dispatch(fetchAssignedTasks(orgId)).unwrap();
+        setAssignedTasks(response || []); // Refresh assigned tasks
+        setApiStatus({ type: 'success', message: 'Tasks refreshed successfully' });
+      } catch (error) {
+        console.error('Failed to refresh tasks:', error);
+        setApiStatus({ type: 'error', message: 'Failed to refresh tasks' });
+      }
+    };
+
+    if (tasksLoading) {
+      return (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-medium text-white">Tasks Assigned</h2>
+          <button
+            onClick={handleRefreshTasks}
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className="h-5 w-5" />
+          </button>
+        </div>
+        {editingTask ? (
+          <UpdateTaskForm task={editingTask} onCancel={handleCancelUpdate} />
+        ) : assignedTasks && assignedTasks.length > 0 ? (
+          assignedTasks.map((task) => (
+            <div key={task._id} className="p-4 bg-gray-700/30 border border-gray-600 rounded-lg mb-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-medium text-white">{task.title}</h3>
+                  <p className="text-sm text-gray-400">
+                    Assigned to: {task.assignedTo?.firstName} {task.assignedTo?.lastName}
+                  </p>
+                  {task.department && (
+                    <p className="text-sm text-gray-400">Department: {task.department.name}</p>
+                  )}
+                  {task.dueDate && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Due: {new Date(task.dueDate).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleUpdateTask(task)}
+                    className="px-3 py-1 text-sm bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-lg"
+                  >
+                    Update Task
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTask(task._id)}
+                    className="px-3 py-1 text-sm bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg"
+                  >
+                    Delete Task
+                  </button>
+                </div>
+              </div>
+              {task.description && (
+                <div className="mt-2 text-sm text-gray-300">
+                  <p>{task.description}</p>
+                </div>
+              )}
+            </div>
+          ))
+        ) : (
+          <div className="text-center py-12">
+            <ClipboardList className="mx-auto h-12 w-12 text-gray-500" />
+            <h3 className="mt-4 text-lg font-medium text-white">No Tasks Assigned</h3>
+            <p className="mt-1 text-gray-400">Tasks assigned to members will appear here</p>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (orgLoading) {
     return <div className="text-gray-400">Loading permissions...</div>;
@@ -1106,6 +1198,7 @@ const OrganizationDashboard = () => {
               { id: 'departments', icon: Briefcase, label: 'Departments' },
               { id: 'invite', icon: UserPlus, label: 'Invite' },
               { id: 'requests', icon: Clock, label: 'Requests' },
+              { id: 'tasksAssigned', icon: ClipboardList, label: 'Tasks Assigned' },
             ].map((tab) => (
               <motion.button
                 key={tab.id}
@@ -1263,9 +1356,6 @@ const OrganizationDashboard = () => {
                       </div>
                     </div>
                   )}
-                  
-                  {/* Permissions dropdown */}
-                  <PermissionsDropdown />
                 </div>
               </div>
             )}
@@ -1609,6 +1699,9 @@ const OrganizationDashboard = () => {
                 </div>
               </div>
             )}
+
+            {/* Tasks Assigned Tab */}
+            {activeTab === 'tasksAssigned' && <TasksAssignedTab />}
           </motion.div>
         </AnimatePresence>
       </main>

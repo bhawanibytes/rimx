@@ -31,6 +31,7 @@ const reportSchema = new mongoose.Schema(
       ref: 'Organization',
       required: true,
     },
+     departmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', required: true },
   },
   {
     timestamps: true,

@@ -41,7 +41,7 @@ app.use("/v1/auth", authRouter);
 
 // Organization routes (without auth middleware)
 app.use("/v1/auth", authRouter);
-app.use("/v1/invitations", auth, inviteRouter);
+app.use("/v1/org/organizations", auth, inviteRouter);
 app.use("/v1/org/user", auth, inviteRouter);
 app.use("/v1/org/organizations", auth, organizationRouter);
 app.use("/v1/org/organizations", auth, organizationRouter);
@@ -52,14 +52,16 @@ app.use("/v1/org/organizations", auth, membersRouter); // Add members routes
 app.use("/v1/user", userRouter); // Add the user routes
 
 // Report routes
-app.use('/v1/reports', reportRouter);
+app.use('/v1', reportRouter);
 
 // Task routes
 app.use('/v1/org', taskRouter);
 app.use('/v1/org', organizationRouter);
+app.use("/v1/org/organizations", auth, departmentRouter);
+app.use("/v1/org/departments", auth, departmentRouter);
 // Error handling middleware (should be last)
 app.use((err, req, res, next) => {
-app.use("/v1/org/departments", auth, departmentRouter);
+
   res.status(500).json({
     success: false,
     error: "Server error",
@@ -68,9 +70,6 @@ app.use("/v1/org/departments", auth, departmentRouter);
     message: err.message,
   });
 });
-app.use('/v1/org', taskRouter);
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
@@ -78,4 +77,12 @@ app.use((err, req, res, next) => {
     error: "Server error",
     message: err.message,
   });
-});});
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+export default app;
+

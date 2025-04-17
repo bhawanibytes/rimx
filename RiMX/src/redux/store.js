@@ -18,6 +18,8 @@ import roleReducer from '../features/roles/roleSlice';
 import joinRequestSlice from '../features/joinRequest/joinRequestSlice';
 import departmentsReducer from '../features/departments/departmentSlice';
 import userProfileReducer from '../features/userprofile/userprofileSlice';
+import taskReducer from '../features/tasks/taskSlice';
+import dashboardReducer from '../features/dashboard/dashboardSlice';
 export const store = configureStore({
   reducer: {
     auth: authReducer,
@@ -25,6 +27,9 @@ export const store = configureStore({
     invitations: invitationReducer,
     memberships: membershipReducer,
     roles: roleReducer,
-    joinRequests: joinRequestSlice, userProfile: userProfileReducer, departments: departmentsReducer
+    joinRequests: joinRequestSlice, userProfile: userProfileReducer,
+     departments: departmentsReducer,
+     task: taskReducer,
+     dashboard: dashboardReducer,
   },
 });
