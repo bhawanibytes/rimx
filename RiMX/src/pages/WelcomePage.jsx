@@ -27,6 +27,7 @@ import {
   fetchPendingInvitations,
   respondToInvitation,
 } from "../features/invitation/invitationSlice";
+import { fetchUserData } from "../features/slices/authSlice";
 
 const WelcomePage = () => {
   const [activeTab, setActiveTab] = useState("organizations");
@@ -37,7 +38,7 @@ const WelcomePage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const orgId = localStorage.getItem("orgId");
-
+const userId = localStorage.getItem("userId");
   // Redux state
   const { user } = useSelector((state) => state.auth);
   const {
@@ -52,6 +53,8 @@ const WelcomePage = () => {
     error: invitesError,
   } = useSelector((state) => state.invitations);
   const { error: joinRequestError } = useSelector((state) => state.joinRequests);
+
+  
 
   // Check if user owns any organizations
   const userOwnsOrganization = userOrganizations?.some(org => org.role === 'owner');
@@ -75,6 +78,13 @@ const WelcomePage = () => {
       dispatch(fetchAllOrganizations());
     }
   }, [activeTab, dispatch, user?.id, orgId]);
+
+  // Fetch user data if not available
+  useEffect(() => {
+    if (!user) {
+      dispatch(fetchUserData());
+    }
+  }, [user, dispatch]);
 
   // Clear organization error when unmounting
   useEffect(() => {
@@ -109,7 +119,7 @@ const WelcomePage = () => {
 
   // Handle organization creation
   const handleCreateOrg = async () => {
-    if (!user || !user.name) {
+    if (!user || !user.firstName) {
       showMessage("User information not available!", false);
       return;
     }
@@ -117,7 +127,8 @@ const WelcomePage = () => {
     try {
       const result = await dispatch(
         createOrganization({
-          name: `Team ${user.name}'s Organization`,
+          name: `Team  ${user.firstName} ${user.lastName}'s Organization`,
+          userId
         })
       ).unwrap();
       showMessage("Organization created successfully!");
@@ -187,15 +198,22 @@ const WelcomePage = () => {
 
   // UI Components
   const RoleBadge = ({ role, department }) => {
+    if (!role) {
+      return null; // Return nothing if role is undefined
+    }
+
     const roleColors = {
       owner: "bg-purple-500/10 text-purple-400 border-purple-500/30",
       admin: "bg-blue-500/10 text-blue-400 border-blue-500/30",
       member: "bg-green-500/10 text-green-400 border-green-500/30",
     };
+
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
-        roleColors[role] || "bg-gray-500/10 text-gray-400 border-gray-500/30"
-      }`}>
+      <span
+        className={`px-3 py-1 rounded-full text-xs font-medium border ${
+          roleColors[role] || "bg-gray-500/10 text-gray-400 border-gray-500/30"
+        }`}
+      >
         {role.charAt(0).toUpperCase() + role.slice(1)} 
         {department && ` - ${department.name}`}
       </span>

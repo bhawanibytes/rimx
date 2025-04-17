@@ -32,11 +32,12 @@ export const createOrganization = createAsyncThunk(
   'organizations/create',
   async (orgData, { getState, rejectWithValue }) => {
     const { auth } = getState();
-    if (!auth.user || !auth.user.id) {
+    console.log("Auth user in createOrganization:", auth.user);
+    if (!auth.user || !auth.user._id) {
       return rejectWithValue("User is not authenticated or user ID is missing.");
     }
     try {
-      const response = await createOrgAPI({ ...orgData, createdBy: auth.user.id });
+      const response = await createOrgAPI({ ...orgData, createdBy: auth.user._id });
 
       if (!response.organization?.id) {
         console.error("Organization ID is missing in the response.");
