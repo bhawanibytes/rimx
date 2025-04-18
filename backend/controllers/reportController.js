@@ -10,13 +10,13 @@ export const createReport = async (req, res) => {
     const userId = req.user._id;
     const {orgId} = req.params;
 
-    //  Find the user's department
-    const membership = await Membership.findOne({ user: userId, organization: orgId }).populate('department');
-    if (!membership || !membership.department) {
-       return res.status(400).json({ success: false, message: 'User does not belong to any department.' });
-     }
+    // //  Find the user's department
+    // const membership = await Membership.findOne({ user: userId, organization: orgId }).populate('department');
+    // if (!membership || !membership.department) {
+    //    return res.status(400).json({ success: false, message: 'User does not belong to any department.' });
+    //  }
 
-     const departmentId = membership.department._id;
+    //  const departmentId = membership.department._id;
 
     const newReport = await Report.create({
       title,
@@ -25,7 +25,7 @@ export const createReport = async (req, res) => {
       taskId,
       userId,
       organizationId: orgId,
-      departmentId, // Include department reference
+      // departmentId, // Include department reference
     });
 
     res.status(201).json({ success: true, report: newReport });
